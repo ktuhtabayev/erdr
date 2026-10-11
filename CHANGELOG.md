@@ -5,6 +5,8 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-11 — the template's design, light and dark themes
+
 ### Added
 
 - Light and dark themes for the desktop application: **View → Light theme** (the default),
@@ -30,6 +32,9 @@ and [Semantic Versioning](https://semver.org/).
 - The desktop application could crash when its appearance changed after several runs: a table's
   model was owned by Python only and could be freed while its view was still alive. Models now
   belong to their views, and the Results page deletes the tables of the previous run.
+- The release notes of a GitHub release were the fallback text "Release v<version>": the release
+  job's CHANGELOG lookup used a wildcard pattern that never matched. It now matches the entry by
+  its literal heading.
 
 ## [0.1.0] — 2026-10-11 — ERDR: library, CLI, desktop application, executable
 
