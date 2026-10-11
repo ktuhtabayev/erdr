@@ -85,17 +85,21 @@ class ResultsPage(Page):
         self.tabs.currentChanged.connect(lambda _: self._explain())
         self.figure_choice = QComboBox()
         self.figure_view = FigureView()
-        self.explorer = SpheresExplorer()
+        self.explorer = SpheresExplorer(self)  # owned by Qt from the start (ADR-020)
+        self.explorer.hide()
         state.resultChanged.connect(self._show)
         self._show(state.result)
 
     def _show(self, result: ExperimentResult | None) -> None:
+        # clear() detaches the pages of the previous run without deleting them, as every release
+        # before 0.4.0 did; the explorer is one widget, reused (ADR-020)
+        self.tabs.clear()
         self.views.clear()
         self.tables.clear()
         while self.tabs.count():  # the tabs of the previous run are deleted, not only hidden
             page = self.tabs.widget(0)
             self.tabs.removeTab(0)
-            if page is not None and page is not self.explorer:  # the explorer stays
+            if page is not None:
                 page.deleteLater()
         self.empty.setVisible(result is None)
         self.tabs.setVisible(result is not None)

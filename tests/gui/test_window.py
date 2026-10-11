@@ -336,6 +336,7 @@ def test_a_second_run_replaces_the_tabs(loaded: MainWindow, run: Run, qapp):
 def test_hypersphere_explorer(loaded: MainWindow, run: Run, qtbot: QtBot):
     page = loaded.results_page
     explorer = page.explorer
+    assert explorer.parent() is not None  # owned by Qt before any run (ADR-020)
     run(loaded)
     page.show_tab("explorer")
     assert page.tabs.currentWidget() is explorer

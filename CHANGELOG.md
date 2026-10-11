@@ -5,6 +5,14 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The GUI tests could end with exit code 1 (or 127) after all of them had passed: the hypersphere
+  explorer of 0.4.0 was created without a Qt parent, so a window that never ran ERDR left it to be
+  destroyed after the Qt application, when Python shut down. The explorer now belongs to the
+  Results page from the start, and the page detaches the tables of an earlier run as before 0.4.0
+  (ADR-020). The CI run of v0.4.0 failed on this, so 0.4.0 has no release.
+
 ## [0.4.0] — 2026-10-11 — Steps 1–5 as hyperspheres
 
 ### Added
