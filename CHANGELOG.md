@@ -5,6 +5,8 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-11 — colour categories: one colour per meaning
+
 ### Added
 
 - Colour categories across the project, one colour per meaning (ADR-019), from one source
