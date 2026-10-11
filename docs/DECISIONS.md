@@ -331,10 +331,16 @@ the new visuals follow the same style and formats.
   `figures/iteration-spheres.gif`, the iterations as an animation (`gif` in the figure formats).
   `erdr spheres` prints the same tables and saves the same figures (`--object`, `--iteration`,
   `--figure`).
-- **Two GUI fixes found on the way.** A figure shown after its canvas was laid out kept its own
-  size (the canvas clipped it) — `FigureView` now gives it the canvas's size, as matplotlib's resize
-  handler would. The Results page cleared its tabs before the loop that deletes them, so the tables
-  of earlier runs were only detached; the loop now deletes them, and the explorer is kept across
-  runs.
+- **A GUI fix found on the way.** A figure shown after its canvas was laid out kept its own size
+  (the canvas clipped it) — `FigureView` now gives it the canvas's size, as matplotlib's resize
+  handler would.
+- **Qt owns every widget (0.4.1).** In 0.4.0 the hypersphere explorer was created without a
+  parent and joined the tab widget only when a run arrived; in the GUI tests that never run ERDR it
+  stayed owned by Python until the interpreter shut down, after the Qt application — Qt aborted
+  (exit code 1 or 127 after every test had passed; the CI run of v0.4.0 failed, so 0.4.0 has no
+  release). The explorer is now a child of the Results page from the start and one widget kept
+  across runs. 0.4.0 also let the Results page delete the pages of an earlier run; 0.4.1 detaches
+  them again as before (it clears its tabs before the loop that would delete them — unlike what
+  ADR-018 says), the behaviour every earlier release ran with.
 
 No numerical result changes.
