@@ -9,7 +9,7 @@ saved run first) or the GUI's Export page. `all` is every format.
 | `json` | `run.json` | every table, the settings, notes and warnings |
 | `markdown` | `report.md` | the settings and every table |
 | `latex` | `latex/<table>.tex`, `latex/tables.tex` | booktabs tables, ASCII only (S$_{1}$, $\rho$) |
-| `xlsx` | `workbook.xlsx` | tables stacked per sheet like the ERDR workbook; figures on *Charts*; cell marks as fills |
+| `xlsx` | `workbook.xlsx` | tables stacked per sheet like the ERDR workbook; figures on *Charts*; the workbook's colours and legend |
 | `figures` | `figures/<figure>.png`, `.svg` | the 2-D map, r and z, priorities, sample sizes, class composition (+ readings, sweep) |
 | `html` | `report.html` | one self-contained page: settings, figures (inline SVG), tables |
 | `datasets` | `datasets/training|validation.dat|csv` | D and F in the author's extended layout |
@@ -20,12 +20,27 @@ composition, cases — plus the readings comparison and the k sweep when they ar
 samples larger than 60 objects the m × m tables are left out of Markdown, LaTeX and HTML (they
 stay in CSV, JSON and Excel).
 
+## Colours
+
+Excel, the HTML report, the figures and the desktop application share one colour per meaning
+(`erdr.export.theme`, ADR-019) — the ERDR workbook's legend. Column headers show what a column
+holds: quantitative feature (set I) light blue, nominal feature (set J) light yellow, the class
+label pink, the ERDR characteristics r, g, z light green, d green, parameters lavender. Cells show
+what a value is: the classes K1 blue, K2 orange (their colours in every figure), the training
+sample D aqua and the validation sample F violet, the selected object green, members of L and
+lowered counters yellow, enemies red, and ⚠ a switch or reading that is not the literal article
+text orange. The workbook's sheet tabs carry the colour of their stage, its *Overview* lists the
+colours the export uses, and the HTML report shows the same legend and names a colour when the
+pointer rests on a cell. CSV, JSON, Markdown and LaTeX stay plain.
+
 ## Figures
 
 The figures use one categorical palette in a fixed order (blue, orange, aqua, …), validated for
-colour-vision deficiency; the class is also told by the marker shape and the sample by the fill
-(filled = D, hollow = F), so nothing rests on colour alone. The 2-D map is a classical
-multidimensional scaling of ρ — positions are approximate.
+colour-vision deficiency. In every figure of a run the colour is the class, which the marker
+shape tells as well, and the fill is the sample (filled = D, hollow = F), so nothing rests on
+colour alone. The sample sizes are drawn in the colours of D and F; a reading keeps its colour in
+every figure (literal green, closest blue). The 2-D map is a classical multidimensional scaling of
+ρ — positions are approximate.
 
 ![The sample sizes through the iterations](images/gui/results-figure.png)
 

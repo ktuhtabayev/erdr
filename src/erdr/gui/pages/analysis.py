@@ -1,4 +1,8 @@
-"""Readings & k page: every reading of §1.1, and the training-sample size for many k."""
+"""Readings & k page: every reading of §1.1, and the training-sample size for many k.
+
+Switch values of the literal article text are green, the ones that differ orange; the figures
+keep one colour per reading — the literal reading green, the closest blue (ADR-019).
+"""
 
 from __future__ import annotations
 
@@ -21,7 +25,7 @@ from erdr.core.readings import CLOSEST, LITERAL, Readings, ZScope
 from erdr.export.figures import readings_figure, sweep_figure
 from erdr.export.tables import readings_table, sweep_table
 from erdr.gui.state import AppState
-from erdr.gui.widgets import FigureView, Page, TableView, section_title
+from erdr.gui.widgets import FigureView, Legend, Page, TableView, section_title
 from erdr.gui.workers import TaskRunner
 from erdr.services.analysis import Progress, compare_readings, sweep_k
 
@@ -108,10 +112,14 @@ class AnalysisPage(Page):
         ll.setContentsMargins(0, 0, 0, 0)
         self.readings_view = TableView()
         self.sweep_view = TableView()
+        self.readings_legend = Legend()
+        self.sweep_legend = Legend()
         ll.addWidget(section_title("Readings"))
         ll.addWidget(self.readings_view, 1)
+        ll.addWidget(self.readings_legend)
         ll.addWidget(section_title("k sweep"))
         ll.addWidget(self.sweep_view, 1)
+        ll.addWidget(self.sweep_legend)
         splitter.addWidget(left)
         self.figure_view = FigureView()
         splitter.addWidget(self.figure_view)
@@ -202,16 +210,21 @@ class AnalysisPage(Page):
         dataset = self.state.dataset
         if dataset is None:
             return
+        labels = dataset.classes
         if self.state.readings:
-            self.readings_view.show_table(
-                readings_table(self.state.readings, dataset.object_ids, len(dataset.classes))
-            )
+            table = readings_table(self.state.readings, dataset.object_ids, len(labels))
+            self.readings_view.show_table(table, class_labels=labels)
+            self.readings_legend.show_table(table, labels)
         else:
             self.readings_view.setModel(None)
+            self.readings_legend.show_table(None)
         if self.state.sweep:
-            self.sweep_view.show_table(sweep_table(self.state.sweep, len(dataset.classes)))
+            table = sweep_table(self.state.sweep, len(labels))
+            self.sweep_view.show_table(table, class_labels=labels)
+            self.sweep_legend.show_table(table, labels)
         else:
             self.sweep_view.setModel(None)
+            self.sweep_legend.show_table(None)
 
     def _show_readings_figure(self) -> None:
         if self.state.readings and self.state.dataset is not None:

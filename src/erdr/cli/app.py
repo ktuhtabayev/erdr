@@ -5,10 +5,15 @@ normalizers, metrics, formats and datasets that can be chosen), ``run`` (ERDR on
 1, the trace, D and F, the cases; optionally saved and exported), ``readings`` (every reading of
 §1.1), ``sweep`` (|D| for many k), ``validate`` (the package against the ERDR workbook),
 ``runs`` and ``export`` (saved run folders) and ``gui`` (the desktop application).
+
+On a terminal the output is coloured like the GUI and the reports (ADR-019): column headers by
+what they hold, classes K1, K2, … and the samples D, F in their colours, ⚠ lines in the warning
+colour. Colour is left out when the output is not a terminal or ``NO_COLOR`` is set.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -48,6 +53,7 @@ from erdr.export.tables import (
     sweep_table,
 )
 from erdr.export.text import display
+from erdr.export.theme import hex_rgb, swatch
 from erdr.gui import GUI_EXTRA_HINT
 from erdr.log import configure_logging
 from erdr.notation import object_order, object_set
@@ -117,8 +123,20 @@ def main_options(
 # ---------------------------------------------------------------- console tables
 
 
+def paint(text: str, mark: str | None, *, bold: bool = False) -> str:
+    """``text`` in the console colour of ``mark`` (its accent in :mod:`erdr.export.theme`).
+
+    Plain for no mark and when ``NO_COLOR`` is set; click drops the colour by itself when the
+    output is not a terminal.
+    """
+    found = swatch(mark)
+    if found is None or os.environ.get("NO_COLOR"):
+        return text
+    return typer.style(text, fg=hex_rgb(found.accent), bold=bold)
+
+
 def echo_table(table: Table, *, limit: int | None = TABLE_ROWS, decimals: int = 4) -> None:
-    """Print a table with aligned columns (floats rounded for the console)."""
+    """Print a table with aligned columns (floats rounded; marked cells in their colours)."""
     rows = [[display(v, decimals) for v in row] for row in table.rows]
     shown = rows if limit is None or len(rows) <= limit else rows[:limit]
     columns = list(table.columns)
@@ -127,18 +145,20 @@ def echo_table(table: Table, *, limit: int | None = TABLE_ROWS, decimals: int = 
         for j, cell in enumerate(row):
             widths[j] = min(max(widths[j], len(cell)), 48)
 
-    def line(cells: Sequence[str]) -> str:
+    def line(cells: Sequence[str], marks: Sequence[str | None], *, bold: bool = False) -> str:
         parts = []
         for j, cell in enumerate(cells):
             text = cell if len(cell) <= widths[j] else cell[: widths[j] - 1] + "…"
-            parts.append(text.ljust(widths[j]) if j == 0 else text.rjust(widths[j]))
+            gap = " " * (widths[j] - len(text))  # padded outside the colour codes
+            styled = paint(text, marks[j], bold=bold)
+            parts.append(styled + gap if j == 0 else gap + styled)
         return "  ".join(parts).rstrip()
 
     typer.echo(table.title)
-    typer.echo(line(columns))
+    typer.echo(line(columns, [table.header_mark(j) for j in range(len(columns))], bold=True))
     typer.echo("  ".join("─" * w for w in widths))
-    for row in shown:
-        typer.echo(line(row))
+    for r, row in enumerate(shown):
+        typer.echo(line(row, [table.mark(r, j) for j in range(len(row))]))
     if len(shown) < len(rows):
         typer.echo(f"… {len(rows) - len(shown)} more rows (--all shows every row)")
     typer.echo("")
@@ -195,7 +215,7 @@ def config_check(
     typer.echo(f"  preset  {chosen.value if chosen else 'custom'}")
     typer.echo(f"  reading {config.erdr.readings.to_readings().label}")
     for note in reading_notes(config):
-        typer.echo(f"  ⚠ {note.switch}: {note.statement}")
+        typer.echo(paint(f"  ⚠ {note.switch}: {note.statement}", "warning"))
 
 
 def _config(path: Path | None) -> tuple[ExperimentConfig, Path | None]:
@@ -263,8 +283,10 @@ def data_info(source: DatasetArgument = None) -> None:
     typer.echo(f"{s.name}  {s.shape}")
     typer.echo(f"  source        {s.source or '—'}")
     typer.echo(f"  classes       {s.class_text}")
-    typer.echo(f"  quantitative  {len(s.quantitative)}: {', '.join(s.quantitative) or '—'}")
-    typer.echo(f"  nominal       {len(s.nominal)}: {', '.join(s.nominal) or '—'}")
+    quantitative = paint(f"quantitative  {len(s.quantitative)}", "quantitative", bold=True)
+    nominal = paint(f"nominal       {len(s.nominal)}", "nominal", bold=True)
+    typer.echo(f"  {quantitative}: {', '.join(s.quantitative) or '—'}")
+    typer.echo(f"  {nominal}: {', '.join(s.nominal) or '—'}")
     typer.echo(
         f"  permitted k   {s.permitted.text}  (odd k from 3 to 2·min|Kᵢ| − 3 = {s.permitted.k_max})"
     )
@@ -375,9 +397,9 @@ def _print_run(run: ExperimentResult, *, show_all: bool, trace: bool) -> None:
         f"ε = {result.epsilon}"
     )
     for note in run.notes:
-        typer.echo(f"⚠ not the literal article reading — {note}")
+        typer.echo(paint(f"⚠ not the literal article reading — {note}", "warning"))
     for warning in run.warnings:
-        typer.echo(f"⚠ {warning}")
+        typer.echo(paint(f"⚠ {warning}", "warning"))
     typer.echo("")
     if trace:
         echo_table(characteristics_table(run), limit=limit)
@@ -390,8 +412,10 @@ def _print_run(run: ExperimentResult, *, show_all: bool, trace: bool) -> None:
     f_counts = ", ".join(str(c) for c in run.class_counts(result.validation))
     d_set = object_set(result.training, names) if small else ""
     f_set = object_set(result.validation, names) if small else ""
-    typer.echo(f"D (training):   {result.training.size:4d}  by class {d_counts}   {d_set}")
-    typer.echo(f"F (validation): {result.validation.size:4d}  by class {f_counts}   {f_set}")
+    training = paint(f"D (training):   {result.training.size:4d}", "D", bold=True)
+    validation = paint(f"F (validation): {result.validation.size:4d}", "F", bold=True)
+    typer.echo(f"{training}  by class {d_counts}   {d_set}")
+    typer.echo(f"{validation}  by class {f_counts}   {f_set}")
     typer.echo(f"cases: {sum(c.occurs for c in run.cases)} of {len(run.cases)} occur")
     if trace:
         typer.echo("")
@@ -570,19 +594,20 @@ def validate(
         raise _fail(error) from error
     typer.echo(f"{path.name}  ·  tolerance {tolerance:g}")
     for sheet, total, passed in report.sections():
-        mark = "✓" if passed == total else f"✗ {total - passed} failed"
+        ok = passed == total
+        mark = paint("✓" if ok else f"✗ {total - passed} failed", "yes" if ok else "no")
         typer.echo(f"  {sheet:26s} {total:5d} checks  {mark}")
     for check in report.checks if details else report.failures:
-        mark = "✓" if check.passed else "✗"
+        mark = paint("✓", "yes") if check.passed else paint("✗", "no")
         typer.echo(
             f"    {mark} [{check.section}] {check.name}: "
             f"workbook {check.expected!r}, package {check.actual!r}"
         )
     typer.echo(f"  {len(report.checks)} checks")
     if not report.passed:
-        typer.echo("validation FAILED", err=True)
+        typer.echo(paint("validation FAILED", "no", bold=True), err=True)
         raise typer.Exit(EXIT_FAILED)
-    typer.echo("validation passed")
+    typer.echo(paint("validation passed", "yes", bold=True))
 
 
 # ---------------------------------------------------------------- erdr runs / export

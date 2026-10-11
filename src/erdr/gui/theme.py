@@ -3,9 +3,11 @@
 One set of tokens per theme drives Qt's palette and the style sheet: the same colours, font size,
 spacing and widget shapes as the desktop application of ``context-synthetic-recognition``, so the
 author's applications look alike. Themes: light (default), dark, and *system*, which follows the
-Windows light or dark mode with the matching palette. The tinted table cells keep their light
-tints and dark ink in every theme — they carry the workbook's meaning (training sample, selected
-object, …) and look the same on screen, in Excel and in the HTML report.
+Windows light or dark mode with the matching palette. The tinted table cells and headers keep
+their light tints and dark ink in every theme — they carry the workbook's meaning (feature type,
+class, training sample, selected object, …) and look the same on screen, in Excel and in the HTML
+report (:mod:`erdr.export.theme`, ADR-019). A reading switch set to something other than the
+literal article text is shown in the warning colours wherever it is chosen.
 """
 
 from __future__ import annotations
@@ -223,7 +225,7 @@ QListWidget#sidebar::item:selected {{
 
 /* ---- text */
 QLabel#pageTitle {{ font-size: {large}pt; font-weight: 600; }}
-QLabel#pageHint, QLabel#note {{ color: {c.text_muted}; font-size: {small}pt; }}
+QLabel#pageHint, QLabel#note, QLabel#legend {{ color: {c.text_muted}; font-size: {small}pt; }}
 QLabel#sectionTitle {{ font-weight: 600; }}
 QLabel#badge {{
     background-color: {c.accent_soft};
@@ -289,6 +291,11 @@ QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTe
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {{
     background-color: {c.disabled};
     color: {c.disabled_text};
+}}
+QComboBox[flagged="true"], QGroupBox QComboBox[flagged="true"] {{
+    background-color: {c.warning_bg};
+    color: {c.warning_text};
+    border: 1px solid {c.warning_border};
 }}
 QComboBox QAbstractItemView {{
     background-color: {c.surface};

@@ -96,7 +96,8 @@ def test_run_and_results(loaded: MainWindow, run: Run):
     for index in range(loaded.results_page.figure_choice.count()):
         loaded.results_page.figure_choice.setCurrentIndex(index)
         assert loaded.results_page.figure_view.figure.axes
-    assert loaded.result_label.text() == "D = 5, F = 2"
+    assert "D = 5" in loaded.result_label.text()
+    assert "F = 2" in loaded.result_label.text()
     assert any("ERDR finished" in line for line in loaded.run_page.log.toPlainText().splitlines())
 
 

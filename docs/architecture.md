@@ -82,9 +82,11 @@ flowchart LR
     F --> G2["GUI figure canvas"]
 ```
 
-A table cell carries a *mark* — what it means (training sample, selected object, counter decreased,
-tie decided by r …), not how it looks; the GUI, the Excel writer and the HTML report map marks to
-the same tints. Figures are drawn on axes the caller provides, so the GUI embeds the very drawings
+A table cell carries a *mark* — what it means (class K1, training sample, selected object, counter
+decreased, tie decided by r …), not how it looks — and a column header the kind of quantity it
+holds (quantitative or nominal feature, class, r g z, d, parameter); `export.theme` gives every
+mark its colours, so the GUI, the Excel writer, the HTML report, the figures and the console show
+the same categories in the same colours (ADR-019). Figures are drawn on axes the caller provides, so the GUI embeds the very drawings
 the exports save (ADR-012).
 
 ## Extension points

@@ -5,6 +5,30 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Colour categories across the project, one colour per meaning (ADR-019), from one source
+  (`erdr.export.theme`) — the ERDR workbook's colour legend. Column headers show what a column
+  holds (quantitative or nominal feature, class, r g z, d, parameter, sample); cells show the
+  class of an object (K1 blue, K2 orange — as in every figure), the samples D (aqua) and F
+  (violet), the steps of the algorithm, and ⚠ switches that are not the literal article reading.
+- Legends: under every table of the desktop application (the Results page follows the open
+  tab), on the Excel *Overview* and in the HTML report — each lists the colours it uses; tooltips
+  explain a cell's or a header's colour.
+- The Dataset page shows the feature types and the classes in their colours and a bar of the
+  class sizes; the Run page and the status bar show D and F in their colours and the settings as
+  parameter chips; the Configure page turns a non-literal switch and the preset badge orange.
+- Excel sheet tabs and the Results tabs carry the workbook's stage colours.
+- The `erdr` command colours its tables and ⚠ lines on a terminal (`NO_COLOR` turns it off).
+
+### Changed
+
+- The training sample D is aqua and the validation sample F violet in the tables (they were blue
+  and orange, the figures' colours of the classes K1 and K2).
+- Figures: the r–z chart draws r and z in the class colour; the sample sizes use the colours of D
+  and F with end labels; a reading keeps one colour in every figure (literal green, closest blue).
+- The Excel workbook uses the ERDR workbook's title bars and column headers.
+
 ## [0.2.0] — 2026-10-11 — the template's design, light and dark themes
 
 ### Added

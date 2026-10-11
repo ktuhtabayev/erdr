@@ -4,9 +4,12 @@ Every ``draw_*`` function draws on a given :class:`~matplotlib.axes.Axes`, so th
 same drawings as the exports (ADR-012); ``figure(key, …)`` builds a stand-alone
 :class:`~matplotlib.figure.Figure` without pyplot's global state.
 
-Colour follows the class (categorical slots in fixed order, validated for colour-vision
-deficiency); the class is also told by the marker shape, and the sample by the fill — filled =
-training sample D, hollow = validation sample F — so no meaning rests on colour alone.
+The colours are :mod:`erdr.export.theme`'s, so a figure and a table say the same: in every figure
+of a run the colour is the class (K1 blue, K2 orange, … — categorical slots in fixed order,
+validated for colour-vision deficiency, never cycled); the class is also told by the marker
+shape, and the sample by the fill — filled = training sample D, hollow = validation sample F — so
+no meaning rests on colour alone. The sample sizes are drawn in the colours of D (aqua) and F
+(violet); the readings keep one colour each (the literal reading green, the closest blue).
 """
 
 from __future__ import annotations
@@ -22,23 +25,28 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
-from erdr.core.readings import Readings
+from erdr.core.readings import CLOSEST, LITERAL, Readings
 from erdr.export.text import display
+from erdr.export.theme import (
+    AXIS,
+    D_ACCENT,
+    F_ACCENT,
+    GRID,
+    INK,
+    INK_SECONDARY,
+    MUTED,
+    READING_COLOURS,
+    SURFACE,
+    class_colour,
+)
 from erdr.notation import class_name
 from erdr.services.analysis import ReadingRow, SweepRow
 from erdr.services.experiment import ExperimentResult
 
-SERIES = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948")
-"""Categorical slots in their fixed order (blue, orange, aqua, yellow, magenta, green, violet,
-red); classes and series take them in order, never cycled."""
+_HIGHLIGHT_KEYS = (("green", "literal article", LITERAL), ("blue", "closest", CLOSEST))
+"""How the readings figure names its two highlighted readings."""
 MARKERS = ("o", "^", "s", "D", "v", "P", "X", "*")
 """Marker shape per class — the second channel of the class identity."""
-SURFACE = "#fcfcfb"
-INK = "#0b0b0b"
-INK_SECONDARY = "#52514e"
-MUTED = "#898781"
-GRID = "#e1e0d9"
-AXIS = "#c3c2b7"
 LABEL_LIMIT = 40
 """Objects are labelled on the map and the per-object charts up to this many objects."""
 
@@ -60,7 +68,22 @@ def _style(ax: Axes, title: str, *, grid_axis: Literal["x", "y", ""] = "y") -> N
 
 
 def _colour(class_index: int) -> str:
-    return SERIES[class_index % len(SERIES)]
+    return class_colour(class_index)
+
+
+def reading_colour(readings: Readings, others: Sequence[Readings] = ()) -> str:
+    """The colour of a reading in every figure: literal green, closest blue, then ``others``.
+
+    ``others`` lists the further readings of the figure in their order; a reading keeps its
+    colour whichever readings are shown with it, and readings past the palette are grey.
+    """
+    if readings == LITERAL:
+        return READING_COLOURS[0]
+    if readings == CLOSEST:
+        return READING_COLOURS[1]
+    rest = [r for r in others if r not in (LITERAL, CLOSEST)]
+    place = rest.index(readings) + 2 if readings in rest else len(READING_COLOURS)
+    return READING_COLOURS[place] if place < len(READING_COLOURS) else MUTED
 
 
 def _marker(class_index: int) -> str:
@@ -171,28 +194,46 @@ def draw_map(ax: Axes, run: ExperimentResult) -> None:
 
 
 def draw_radii(ax: Axes, run: ExperimentResult) -> None:
-    """r(Sᵢ) (enemy radius) and z(Sᵢ, k) (k-th neighbour) of every object."""
+    """r(Sᵢ) (enemy radius, filled ●) and z(Sᵢ, k) (k-th neighbour, hollow ◇), by class colour."""
     c = run.result.characteristics
     x = np.arange(c.m)
+    colours = [_colour(int(i)) for i in c.classes]
     _style(ax, f"Enemy radius r and k-th neighbour distance z (k = {c.k})")
     ax.vlines(x, np.minimum(c.r, c.z), np.maximum(c.r, c.z), color=AXIS, linewidth=2, zorder=2)
-    ax.scatter(x, c.r, s=64, marker="o", color=SERIES[0], zorder=3, label="r(Sᵢ) — nearest enemy")
+    ax.scatter(x, c.r, s=64, marker="o", color=colours, edgecolors=SURFACE, zorder=3)
     ax.scatter(
-        x,
-        c.z,
-        s=64,
-        marker="D",
-        facecolors="white",
-        edgecolors=SERIES[1],
-        linewidths=1.8,
-        zorder=3,
-        label=f"z(Sᵢ, {c.k}) — k-th neighbour",
+        x, c.z, s=64, marker="D", facecolors="white", edgecolors=colours, linewidths=1.8, zorder=3
     )
     if c.m <= LABEL_LIMIT:
         ax.set_xticks(x, run.object_names)
     ax.set_ylabel("distance ρ")
     ax.set_ylim(bottom=0)
-    ax.legend(frameon=False, fontsize=8, labelcolor=INK_SECONDARY)
+    handles = [
+        Line2D([], [], linestyle="", marker="o", markersize=8, color=MUTED, label="r(Sᵢ) — enemy"),
+        Line2D(
+            [],
+            [],
+            linestyle="",
+            marker="D",
+            markersize=7,
+            markerfacecolor="white",
+            markeredgecolor=MUTED,
+            label=f"z(Sᵢ, {c.k}) — k-th neighbour",
+        ),
+        *(
+            Line2D(
+                [],
+                [],
+                linestyle="",
+                marker="s",
+                markersize=8,
+                color=_colour(index),
+                label=f"{class_name(index)} (class {label})",
+            )
+            for index, label in enumerate(run.dataset.classes)
+        ),
+    ]
+    ax.legend(handles=handles, frameon=False, fontsize=8, labelcolor=INK_SECONDARY)
 
 
 def draw_priorities(ax: Axes, run: ExperimentResult) -> None:
@@ -245,16 +286,25 @@ def draw_sizes(ax: Axes, run: ExperimentResult) -> None:
     d_sizes = [0] + [it.d_size for it in result.iterations]
     queue = [result.m] + [it.queue_left for it in result.iterations]
     _style(ax, "Sample sizes through the iterations")
-    for values, label, colour, marker in (
-        (f_sizes, "|F| working set", SERIES[0], "o"),
-        (d_sizes, "|D| training sample", SERIES[1], "^"),
-        (queue, "objects left in the queue", SERIES[2], "s"),
+    for values, label, short, colour, marker, style in (
+        (f_sizes, "|F| validation sample (working set)", "F", F_ACCENT, "o", "-"),
+        (d_sizes, "|D| training sample", "D", D_ACCENT, "^", "-"),
+        (queue, "objects left in the queue", "queue", MUTED, "s", "--"),
     ):
-        ax.step(t, values, where="post", color=colour, linewidth=2, label=label)
+        ax.step(t, values, where="post", color=colour, linewidth=2, linestyle=style, label=label)
         ax.plot(t, values, linestyle="", marker=marker, color=colour, markersize=6)
+        ax.annotate(  # the direct label: which line, and where it ends
+            f"{short} {values[-1]}",
+            (t[-1], values[-1]),
+            textcoords="offset points",
+            xytext=(6, 0),
+            va="center",
+            fontsize=8,
+            color=INK_SECONDARY,
+        )
     ax.set_xlabel("iteration t")
     ax.set_ylabel("objects")
-    ax.margins(y=0.06)  # keeps the markers on 0 visible
+    ax.margins(x=0.1, y=0.06)  # keeps the markers on 0 and the end labels visible
     ax.legend(frameon=False, fontsize=8, labelcolor=INK_SECONDARY)
 
 
@@ -300,11 +350,11 @@ def draw_sweep(ax: Axes, rows: Sequence[SweepRow], m: int) -> None:
         ax.plot(
             ks,
             sizes,
-            color=_colour(index),
+            color=reading_colour(reading, readings),
             linewidth=2,
             marker=_marker(index),
             markersize=6,
-            label=reading.label,
+            label=reading.label + ("  (literal)" if reading.is_literal else ""),
         )
         if ks:
             ax.annotate(
@@ -328,13 +378,18 @@ def draw_readings(ax: Axes, rows: Sequence[ReadingRow], m: int) -> None:
     sizes = [len(row.training) for row in usable]
     y = np.arange(len(usable))
     _style(ax, f"Training-sample size |D| per reading (m = {m})", grid_axis="x")
-    colours = [SERIES[0] if row.readings.is_literal else MUTED for row in usable]
+    highlighted = (LITERAL, CLOSEST)
+    colours = [
+        reading_colour(row.readings) if row.readings in highlighted else MUTED for row in usable
+    ]
     bars = ax.barh(y, sizes, height=0.62, color=colours, edgecolor=SURFACE, linewidth=2)
     ax.bar_label(bars, fontsize=8, color=INK_SECONDARY, padding=3)
     ax.set_yticks(y, labels)
     ax.invert_yaxis()
     ax.set_xlim(0, m)
-    ax.set_xlabel("|D|  (blue: the literal article reading)")
+    shown = {row.readings for row in usable}
+    keys = [f"{hue}: the {name} reading" for hue, name, r in _HIGHLIGHT_KEYS if r in shown]
+    ax.set_xlabel("|D|" + (f"  ({' · '.join(keys)})" if keys else ""))
 
 
 RUN_FIGURES: dict[str, tuple[str, Callable[[Axes, ExperimentResult], None]]] = {

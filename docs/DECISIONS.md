@@ -212,3 +212,57 @@ sizes and spacing — and give it a light ("white") mode, not only the Windows d
   the tables of a previous run instead of only hiding them.
 
 No numerical result changes.
+
+## ADR-019 — One colour per meaning, everywhere (author)
+
+*Accepted, 2026-10-11.*
+
+**Author.** Give classes, nominal and quantitative features, the samples, the parameters and the
+other categories distinct colours, consistently across the project — the GUI, the tables, the
+figures, the legends and the experiment displays — following the template, without changing any
+data or logic.
+
+- **One source.** `erdr.export.theme` maps every *mark* — what a cell or a column means — to a
+  light tint, a dark ink and a strong accent; the GUI, the Excel writer, the HTML report, the
+  figures and the console all read it. `Table.header_marks` (new) says what kind of quantity a
+  column holds; the cell marks of ADR-012 say what a value is. Marks never change a value; the
+  CSV, JSON, Markdown and LaTeX exports stay plain.
+- **The workbook's legend.** The colours are those of the ERDR workbook's *Overview* ("Colour
+  legend"), which the template's workbooks share: quantitative feature (set I) `#DDEBF7`, nominal
+  feature (set J) `#FFF2CC`, class label `#F4CCCC`, ERDR characteristic r, g, z `#E2EFDA`, d /
+  selected / own class / literal / occurs `#C6EFCE`, member of L / decreased counter / tie by r
+  `#FFE699`, enemy `#FDE9E7`, parameter `#E4DFEC`, type flags `#D9E1F2`, statistic `#F2F2F2`,
+  warning `#FCE4D6`, does not occur `#FFC7CE`. Column headers take the colour of their category;
+  the feature values themselves stay white, so the class cells beside them remain distinct.
+- **Classes keep the figures' colours.** K1 blue, K2 orange, K3 aqua, … — the validated
+  categorical palette of the template's figures, in fixed order, never cycled (a ninth class is
+  grey in the figures and takes the class colour in the tables). The class cells of every table,
+  the object headers and row labels of the m × m tables, the class columns of the compositions,
+  the class bar of the Dataset page and every run figure use them.
+- **One change to the workbook's legend.** The workbook draws the training sample D (and "moved
+  to D", "tie decided by the index") in blue `#BDD7EE`, the class colour of K1. Here **D is aqua**
+  (tint `#B3E5D9`, figures `#1BAF7A`) and the **validation sample F violet** (tint `#D6CFF7`,
+  figures `#6250D6`), in the tables and in the sample-sizes figure alike; before, the tables drew D
+  blue and F orange — the colours of K1 and K2 in the figures.
+- **Figures.** In every figure of a run the colour is the class: the r–z chart now marks r
+  (filled ●) and z (hollow ◇) in the class colour instead of blue and orange. The sample sizes
+  are drawn in D's and F's colours, with the queue grey and dashed, and labelled at their ends.
+  A reading keeps one colour in every figure: the literal reading green (as in the tables), the
+  closest reading blue, further ones yellow and magenta (validated together); before, the sweep
+  coloured readings by their position.
+- **Non-literal readings stay flagged.** Switch values that differ from the article's text are in
+  the warning colour in the readings, sweep and key-results tables, on the Configure page (the
+  switch and the preset badge) and on the Run page; the console prints ⚠ lines in that colour.
+- **Legends.** Each GUI table shows a legend of the marks it uses (the Results page follows the
+  open tab); the Excel *Overview* and the HTML report list the marks of the export, by section
+  (columns, classes, samples, steps of the algorithm, readings and checks). Cells and headers
+  explain their colour in a tooltip (GUI, HTML).
+- **Stages.** The Excel sheet tabs and the Results tabs carry the workbook's stage colours (data
+  blue, Step 0 purple, Steps 1–5 orange, Step 6 green, readings gold).
+- **Console.** `erdr` colours headers, classes, samples, warnings and validation marks on a
+  terminal with the accents; nothing is coloured when the output is redirected or `NO_COLOR` is
+  set.
+- The template project is only read, never changed. Tints keep their light fill and dark ink in
+  the dark theme (ADR-018).
+
+No numerical result changes.

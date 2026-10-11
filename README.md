@@ -40,7 +40,8 @@ Step 5  |L| > 1 → g(Sⱼ) − 1 for Sⱼ ∈ L;  g(Sⱼ) = 1 → Sⱼ to D    
 | Services | runner, repeatable run folders, readings comparison, k sweeps, workbook validation | ✓ |
 | Exports | CSV, JSON, Markdown, LaTeX, Excel (laid out like the workbook), PNG/SVG figures, HTML report, training/validation datasets | ✓ |
 | Interfaces | `erdr` CLI, desktop GUI (PySide6) in the template's design with light and dark themes, portable Windows executable | ✓ |
-| Quality | 157 tests (golden: workbook, guide, Table 1; property-based; GUI), 94 % coverage, mypy strict, ruff, Windows CI | ✓ |
+| Colours | one colour per meaning in the GUI, Excel, HTML, figures and console — feature types, classes, D and F, parameters, steps, ⚠ non-literal readings (the workbook's legend) | ✓ |
+| Quality | 172 tests (golden: workbook, guide, Table 1; property-based; GUI), 94 % coverage, mypy strict, ruff, Windows CI | ✓ |
 
 ## The desktop application without Python
 

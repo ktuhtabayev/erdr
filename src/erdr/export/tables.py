@@ -17,7 +17,18 @@ means, not how it looks — which the GUI, the Excel writer and the HTML report 
 ``literal``
     the literal article reading (readings tables);
 ``yes`` / ``no``
-    a case that occurs / does not.
+    a case that occurs / does not;
+``K1``, ``K2``, …
+    the class of the object (:func:`~erdr.export.theme.class_mark`);
+``literal`` / ``warning``
+    a switch value of the literal reading / one that differs from it;
+``statistic``, ``type``, ``parameter``
+    a scaling statistic, the feature-type row, a setting.
+
+:attr:`Table.header_marks` says what kind of quantity a column holds — a ``quantitative`` or
+``nominal`` feature, the ``class``, an ERDR ``characteristic`` (r, g, z), the ``priority`` d, a
+``parameter``, a sample ``D`` / ``F``, a class ``K1`` …; :mod:`erdr.export.theme` gives every
+mark its colours.
 """
 
 from __future__ import annotations
@@ -28,6 +39,9 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from erdr.core.algorithm import Decision
+from erdr.core.readings import Readings, ZScope
+from erdr.data.schema import Dataset
+from erdr.export.theme import class_mark
 from erdr.notation import (
     DASH,
     changes_text,
@@ -67,12 +81,25 @@ class Table:
     """The workbook sheet this table mirrors."""
     extra: dict[str, str] = field(default_factory=dict)
     """Additional text (e.g. the definition of the columns)."""
+    header_marks: tuple[str | None, ...] = ()
+    """Per column, an optional mark of its header: what kind of quantity the column holds."""
 
     def mark(self, row: int, column: int) -> str | None:
         """The mark of a cell, or ``None``."""
         if not self.marks:
             return None
         return self.marks[row][column]
+
+    def header_mark(self, column: int) -> str | None:
+        """The mark of a column header, or ``None``."""
+        if not self.header_marks:
+            return None
+        return self.header_marks[column]
+
+    def used_marks(self) -> set[str]:
+        """Every mark of the table's cells and headers (what its legend has to explain)."""
+        found = {mark for row in self.marks for mark in row if mark}
+        return found | {mark for mark in self.header_marks if mark}
 
 
 def _marks(rows: Sequence[Sequence[Cell]]) -> list[list[str | None]]:
@@ -85,6 +112,48 @@ def _sample_mark(run: ExperimentResult, j: int) -> str:
 
 def _labels(run: ExperimentResult) -> tuple[str, ...]:
     return tuple(str(v.item()) for v in run.dataset.y)
+
+
+def class_marks(dataset: Dataset) -> tuple[str, ...]:
+    """The class mark (``K1`` …) of every object."""
+    return tuple(class_mark(int(i)) for i in dataset.class_index)
+
+
+def _class_marks(run: ExperimentResult) -> tuple[str, ...]:
+    return class_marks(run.dataset)
+
+
+def feature_marks(dataset: Dataset) -> tuple[str, ...]:
+    """``quantitative`` or ``nominal`` for every feature, in column order."""
+    return tuple("quantitative" if q else "nominal" for q in dataset.quantitative)
+
+
+def _class_columns(classes: int) -> tuple[str, ...]:
+    return tuple(class_mark(i) for i in range(classes))
+
+
+def _data_marks(
+    dataset: Dataset, features: Sequence[str], statistics: int = 0
+) -> tuple[tuple[str | None, ...], ...]:
+    """Objects (the class cell in its class colour), the type row, the statistic rows."""
+    width = len(features) + 2
+    rows: list[tuple[str | None, ...]] = [
+        (None, *([None] * len(features)), mark) for mark in class_marks(dataset)
+    ]
+    rows.append(("type", *features, "type"))
+    rows += [tuple(["statistic"] * width)] * statistics
+    return tuple(rows)
+
+
+def _switch_marks(readings: Readings) -> tuple[str, str, str, str]:
+    """A, B, C and the scope of z: ``literal`` where a switch reads the article literally."""
+    a, b, c = tuple(readings.code)
+    return (
+        "literal" if a == "1" else "warning",
+        "literal" if b == "1" else "warning",
+        "literal" if c == "1" else "warning",
+        "literal" if readings.z_scope is ZScope.ALL else "warning",
+    )
 
 
 # ---------------------------------------------------------------- tables of one run
@@ -121,32 +190,49 @@ def summary_table(run: ExperimentResult) -> Table:
         ("Share of N in D", result.training.size / result.m),
         ("Cases of the algorithm that occur", f"{occurring} of {len(run.cases)}"),
     ]
+    reading = "literal" if result.readings.is_literal else "warning"
+    marks: list[tuple[str | None, ...]] = [(None, None)] * len(rows)
+    for row in (2, 3, 4):
+        marks[row] = ("parameter", None)
+    marks[5] = ("parameter", reading)
+    marks[8] = (None, "D")
+    marks[9] = (None, "F")
     return Table(
         "summary",
         "Key results",
         ("Figure", "Value"),
         tuple(rows),
+        tuple(marks),
         note="; ".join(run.notes) if run.notes else "Literal article reading.",
         sheet="Overview",
     )
 
 
-def dataset_table(run: ExperimentResult) -> Table:
-    """The sample E₀ — sheet *Dataset*."""
-    ds = run.dataset
-    labels = _labels(run)
+def sample_table(ds: Dataset, title: str | None = None) -> Table:
+    """A sample: objects, features, class and the type row — sheet *Dataset* (no run needed).
+
+    Feature columns are marked ``quantitative`` or ``nominal``, the class cells ``K1``, ``K2`` …
+    """
     rows: list[tuple[Cell, ...]] = [
-        (ds.object_ids[i], *(float(v) for v in ds.X[i]), labels[i]) for i in range(ds.m)
+        (ds.object_ids[i], *(float(v) for v in ds.X[i]), str(ds.y[i].item())) for i in range(ds.m)
     ]
     rows.append(("Type", *ds.type_flags, "1 = I"))
+    features = feature_marks(ds)
     return Table(
         "dataset",
-        f"Dataset · {ds.name}",
+        f"Dataset · {ds.name}" if title is None else title,
         ("№", *ds.feature_names, "Class"),
         tuple(rows),
+        _data_marks(ds, features),
         note="Last row: feature types (1 = quantitative, set I; 0 = nominal, set J).",
         sheet="Dataset",
+        header_marks=(None, *features, "class"),
     )
+
+
+def dataset_table(run: ExperimentResult) -> Table:
+    """The sample E₀ — sheet *Dataset*."""
+    return sample_table(run.dataset)
 
 
 def normalized_table(run: ExperimentResult) -> Table:
@@ -158,15 +244,19 @@ def normalized_table(run: ExperimentResult) -> Table:
         (ds.object_ids[i], *(float(v) for v in Z[i]), labels[i]) for i in range(ds.m)
     ]
     rows.append(("Type", *ds.type_flags, "1 = I"))
-    for key, values in run.distances.scaling.statistics.items():
+    statistics = run.distances.scaling.statistics
+    for key, values in statistics.items():
         rows.append((key, *(DASH if np.isnan(v) else float(v) for v in values), ""))
+    features = feature_marks(ds)
     return Table(
         "normalized",
         f"Step 0 · Scale unification ({run.distances.scaling.normalizer})",
         ("№", *(f"{name}′" for name in ds.feature_names), "Class"),
         tuple(rows),
+        _data_marks(ds, features, len(statistics)),
         note="Quantitative features rescaled over the objects of E₀; nominal codes unchanged.",
         sheet="Normalized Dataset",
+        header_marks=(None, *features, "class"),
     )
 
 
@@ -185,12 +275,21 @@ def _matrix(
         (names[i], *(float(values[i, j]) for j in range(m))) for i in range(m)
     ]
     same = run.result.characteristics.classes
+    objects = _class_marks(run)
     marks = [
-        [None, *("own" if same[i] == same[j] and i != j else None for j in range(m))]
+        [objects[i], *("own" if same[i] == same[j] and i != j else None for j in range(m))]
         for i in range(m)
     ]
     return Table(
-        key, title, (corner, *names), tuple(rows), tuple(tuple(r) for r in marks), note, True, sheet
+        key,
+        title,
+        (corner, *names),
+        tuple(rows),
+        tuple(tuple(r) for r in marks),
+        note,
+        True,
+        sheet,
+        header_marks=(None, *objects),
     )
 
 
@@ -239,6 +338,7 @@ def neighbours_table(run: ExperimentResult) -> Table:
     """Rank of Sⱼ in the neighbour list of Sᵢ — sheet *Sorted Neighbors*."""
     c = run.result.characteristics
     names = run.object_names
+    objects = _class_marks(run)
     m = c.m
     rows: list[tuple[Cell, ...]] = []
     marks: list[tuple[str | None, ...]] = []
@@ -247,7 +347,7 @@ def neighbours_table(run: ExperimentResult) -> Table:
         rows.append((names[i], *(DASH if i == j else rank[j] for j in range(m))))
         marks.append(
             (
-                None,
+                objects[i],
                 *(
                     None
                     if i == j
@@ -269,6 +369,7 @@ def neighbours_table(run: ExperimentResult) -> Table:
         "Shaded: own class inside the enemy sphere; marked: enemies.",
         True,
         "Sorted Neighbors",
+        header_marks=(None, *objects),
     )
 
 
@@ -277,6 +378,7 @@ def characteristics_table(run: ExperimentResult) -> Table:
     c = run.result.characteristics
     names = run.object_names
     labels = _labels(run)
+    objects = _class_marks(run)
     scope = "any class" if c.z_scope.value == "all" else "the own class"
     rows: list[tuple[Cell, ...]] = []
     marks: list[tuple[str | None, ...]] = []
@@ -298,7 +400,7 @@ def characteristics_table(run: ExperimentResult) -> Table:
                 ", ".join([f"{names[i]} (itself)", *inside]),
             )
         )
-        marks.append((_sample_mark(run, i), *([None] * 11)))
+        marks.append((_sample_mark(run, i), objects[i], *([None] * 10)))
     return Table(
         "characteristics",
         f"Step 1 · r, g, z, d (k = {c.k}, z over {scope})",
@@ -321,6 +423,20 @@ def characteristics_table(run: ExperimentResult) -> Table:
         "r = nearest-enemy distance · g = own-class objects strictly inside the enemy sphere "
         "(Sᵢ counts) · z = distance to the k-th neighbour · d = |z − r| / (z + r).",
         sheet="ERDR Characteristics",
+        header_marks=(
+            None,
+            "class",
+            None,
+            "characteristic",
+            "characteristic",
+            "characteristic",
+            None,
+            "characteristic",
+            "characteristic",
+            "priority",
+            "priority",
+            None,
+        ),
     )
 
 
@@ -328,11 +444,13 @@ def spheres_table(run: ExperimentResult) -> Table:
     """M(i, j) = 1 when Sⱼ ∈ K_t and ρ(Sᵢ, Sⱼ) < r(Sᵢ) — the enemy-sphere matrix."""
     c = run.result.characteristics
     names = run.object_names
+    objects = _class_marks(run)
     rows: list[tuple[Cell, ...]] = [
         (names[i], *(int(c.spheres[i, j]) for j in range(c.m)), int(c.g[i])) for i in range(c.m)
     ]
     marks = [
-        (None, *("own" if c.spheres[i, j] else None for j in range(c.m)), None) for i in range(c.m)
+        (objects[i], *("own" if c.spheres[i, j] else None for j in range(c.m)), None)
+        for i in range(c.m)
     ]
     return Table(
         "spheres",
@@ -343,6 +461,7 @@ def spheres_table(run: ExperimentResult) -> Table:
         "Row: who is inside the sphere of Sᵢ; column: whose spheres contain Sⱼ.",
         True,
         "ERDR Characteristics",
+        header_marks=(None, *objects, "characteristic"),
     )
 
 
@@ -351,6 +470,7 @@ def queue_table(run: ExperimentResult) -> Table:
     c = run.result.characteristics
     names = run.object_names
     labels = _labels(run)
+    objects = _class_marks(run)
     decided = c.decided_by()
     text = {"d": "d", "r": "r (equal d)", "index": "index (equal d and r)", "—": "— (last)"}
     mark = {"r": "tie-r", "index": "tie-index"}
@@ -367,7 +487,8 @@ def queue_table(run: ExperimentResult) -> Table:
         for position, i in enumerate(c.priority)
     ]
     marks = [
-        (None, None, None, None, None, None, mark.get(decided[position])) for position in range(c.m)
+        (None, None, None, objects[i], None, None, mark.get(decided[position]))
+        for position, i in enumerate(c.priority)
     ]
     return Table(
         "queue",
@@ -386,6 +507,7 @@ def queue_table(run: ExperimentResult) -> Table:
         "Static order: d and r of a waiting object never change; every iteration takes the "
         "first object still in F and not processed.",
         sheet="Priority Queue",
+        header_marks=("priority", None, None, "class", "priority", "characteristic", None),
     )
 
 
@@ -447,12 +569,31 @@ def iterations_table(run: ExperimentResult) -> Table:
         tuple(marks),
         "L = {Sⱼ ∈ F ∩ K_t | ρ(Sⱼ, Sᵢ) < r(Sⱼ) and g(Sⱼ) > 1} is built before Sᵢ is blocked.",
         sheet="ERDR Trace",
+        header_marks=(
+            None,
+            "selected",
+            None,
+            "priority",
+            "characteristic",
+            None,
+            None,
+            "L",
+            "L",
+            None,
+            "priority",
+            "characteristic",
+            "D",
+            "F",
+            "D",
+            None,
+        ),
     )
 
 
 def counters_table(run: ExperimentResult) -> Table:
     """G after every iteration (start = Step 1) — sheet *ERDR Trace*."""
     names = run.object_names
+    objects = _class_marks(run)
     history = run.result.counter_history()
     rows: list[tuple[Cell, ...]] = []
     marks: list[tuple[str | None, ...]] = []
@@ -478,6 +619,7 @@ def counters_table(run: ExperimentResult) -> Table:
         "Marked: decreased in this iteration; shaded: already in D.",
         True,
         "ERDR Trace",
+        header_marks=(None, *objects),
     )
 
 
@@ -485,6 +627,7 @@ def routes_table(run: ExperimentResult) -> Table:
     """Step 6 · every object's sample and how it got there — sheet *Training & Validation*."""
     names = run.object_names
     labels = _labels(run)
+    objects = _class_marks(run)
     by = {4: "Step 4 · |L| = 1", 5: "Step 5 · g fell to 1", None: "— (stays in F)"}
     rows: list[tuple[Cell, ...]] = []
     marks: list[tuple[str | None, ...]] = []
@@ -500,7 +643,7 @@ def routes_table(run: ExperimentResult) -> Table:
                 route.counter_decreases,
             )
         )
-        marks.append((None, None, _sample_mark(run, j), None, None, None, None))
+        marks.append((None, objects[j], _sample_mark(run, j), None, None, None, None))
     return Table(
         "routes",
         "Step 6 · Training sample D and validation sample F = E₀ \\ D",
@@ -516,6 +659,7 @@ def routes_table(run: ExperimentResult) -> Table:
         tuple(rows),
         tuple(marks),
         sheet="Training & Validation",
+        header_marks=(None, "class", None, None, None, None, "characteristic"),
     )
 
 
@@ -548,6 +692,7 @@ def composition_table(run: ExperimentResult) -> Table:
         tuple(rows),
         tuple(marks),
         sheet="Training & Validation",
+        header_marks=(None, *_class_columns(classes), None, None),
     )
 
 
@@ -633,9 +778,7 @@ def readings_table(rows: Sequence[ReadingRow], names: Sequence[str], classes: in
                     row.iterations,
                 )
             )
-        marks.append(
-            tuple(["literal" if row.readings.is_literal else None] + [None] * (len(out[-1]) - 1))
-        )
+        marks.append((*_switch_marks(row.readings), *([None] * (len(out[-1]) - 4))))
     return Table(
         "readings",
         "Readings of §1.1 · every combination of A, B, C",
@@ -654,8 +797,21 @@ def readings_table(rows: Sequence[ReadingRow], names: Sequence[str], classes: in
         tuple(out),
         tuple(marks),
         "A: Sᵢ in its own L · B: processed objects keep covering · C: return to Step 2 after the "
-        "whole L (1) or the first move (2). Marked: the literal reading.",
+        "whole L (1) or the first move (2). Green: the literal article text; orange: a switch "
+        "that differs from it.",
         sheet="Readings (Switches)",
+        header_marks=(
+            "parameter",
+            "parameter",
+            "parameter",
+            "parameter",
+            None,
+            "D",
+            "F",
+            "D",
+            *_class_columns(classes),
+            None,
+        ),
     )
 
 
@@ -674,6 +830,15 @@ def sweep_table(rows: Sequence[SweepRow], classes: int) -> Table:
         )
         for row in rows
     ]
+    marks = [
+        (
+            None,
+            "literal" if row.readings.is_literal else "warning",
+            *([None] * (classes + 4)),
+            "yes" if row.permitted else "no",
+        )
+        for row in rows
+    ]
     return Table(
         "sweep",
         "Training-sample size |D| by k",
@@ -688,5 +853,18 @@ def sweep_table(rows: Sequence[SweepRow], classes: int) -> Table:
             "Permitted by the k rule",
         ),
         tuple(out),
+        tuple(marks),
+        "Green: the literal article reading; orange: another reading. Permitted k: odd, "
+        "3 ≤ k ≤ 2·min|Kᵢ| − 3.",
         sheet="Article Table 1 Check",
+        header_marks=(
+            "parameter",
+            "parameter",
+            "D",
+            *_class_columns(classes),
+            "F",
+            None,
+            None,
+            "parameter",
+        ),
     )
