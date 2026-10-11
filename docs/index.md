@@ -9,8 +9,9 @@ density of its own class inside that radius.
 This project implements ERDR as a Python library, the `erdr` command line, a desktop application
 and a portable Windows executable. The Excel workbook
 `resources/Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` is the executable
-specification: `erdr validate` compares the package with every one of its computed sheets — 937
-values, all equal ([Validation](validation.md)).
+specification: `erdr validate` compares the package with every one of its computed sheets — 2,927
+values, all equal ([Validation](validation.md)). Its hypersphere sheets show Steps 1–5 as spheres;
+the package draws them in its own style ([Visualizations](visualizations.md)).
 
 !!! warning "Three points of §1.1 are open — they are switches"
     Whether Sᵢ belongs to its own L (**A**), whether processed objects keep covering (**B**) and
@@ -49,6 +50,7 @@ cases: 17 of 17 occur
 ## Where to go next
 
 - [The algorithm](algorithm.md) — every step with its formula, the readings, the cases.
+- [Visualizations](visualizations.md) — every figure from the data to the result, and where it is.
 - [Command line](cli.md) and [Desktop application](gui.md) — how to run it.
 - [Configuration](configuration.md) and [Datasets](datasets.md) — what can be changed.
 - [Architecture](architecture.md) and [Extending](extending.md) — how it is built; adding metrics,

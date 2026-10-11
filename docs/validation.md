@@ -16,14 +16,17 @@ tolerance 1e-9 for numbers, equality for text and integers):
 | Sorted Neighbors | 42 | the rank matrix |
 | ERDR Characteristics | 119 | nearest enemy, r, g, enemy rank, k-th neighbour, z, z − r, d, priority, the own-class list, the sphere matrix |
 | Priority Queue | 14 | the order and the criterion of every adjacent pair |
+| Hyperspheres (Step 1) | 235 | every enemy sphere (r, nearest enemy, own class inside and on it, enemies on it, g, the closed count, its members, its reading) and k-sphere (k-th neighbour, z, members by class, rank e, q, d from q, the relation of the spheres and what it means), the spheres that contain every object with its L, and the summary with its four checks |
 | ERDR Trace | 214 | every iteration (Sᵢ, d, r, \|L\|, L, decision, counters, moves, sizes), g and F after every iteration, every object's route |
+| Hyperspheres (Iterations) | 805 | the overview of every iteration (Sᵢ, candidates, spheres that contain Sᵢ, in D, L, decision) and every block: each object's class, F, own class, ρ(Sⱼ, Sᵢ), r(Sⱼ), r − ρ, containment, g before and after, g > 1, readings A and B, L, move and role; the block summary; the Step 6 blocks |
+| Hypersphere Data | 950 | the diagrams' geometry: ρ_max, the angle step, every object's diagram (titles, ranks, ρ, angles, positions, counted in g), the strips, the radius plane and its lines of equal d, every iteration diagram (title, Sᵢ, ranks, ρ, r, L, counters, moves) |
 | Training & Validation | 45 | sample, iterations, entry step, counter decreases, class composition, D and F |
 | Case Checklist | 34 | every case: occurs, first occurrence |
 | Readings (Switches) | 64 | all eight readings: order, D, F, sizes, iterations |
 | Article Table 1 Check | 90 | five readings × k = 3, 5, 7, 13, 17 on all 270 objects (sizes and classes) and \|D\| for every odd k = 3 … 41 |
 | Validation | 53 | the workbook's own checks of the engine |
 
-All **937** checks pass. The CI runs `erdr validate` on every push.
+All **2,927** checks pass. The CI runs `erdr validate` on every push.
 
 ## Golden tests
 
@@ -40,7 +43,10 @@ All **937** checks pass. The CI runs `erdr validate` on every push.
 Property-based tests (hypothesis) check on random samples that D and F partition E₀, that every
 object is selected at most once, that D is exactly what moved, that L only holds covering objects,
 that reading C = 2 moves at most one object per Step 5, that counters only fall by one and never
-below 1, and that ε does not matter.
+below 1, and that ε does not matter. On random samples with ties and every reading, the sphere view
+holds too: g is the own class strictly inside the enemy sphere (and Sᵢ when r > 0), no enemy lies
+inside it, d equals (1 − q)/(1 + q), and in every iteration the sphere test alone gives exactly L.
+A copy of the workbook with three changed hypersphere values fails exactly those three checks.
 
 ## Findings for the article
 

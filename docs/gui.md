@@ -75,9 +75,10 @@ Runs in the background; the log shows every stage. *Save a run folder* writes a 
 ## Results
 
 Every table of the ERDR workbook for the run — key results, the data, ρ (and ρ_I, ρ_J), the
-neighbour ranks, Step 1, the enemy spheres, the queue with its tie criteria, the iterations, the
-counters, D and F with every object's route, the class composition and the 17 cases — and the
-figures. Headers are coloured by what a column holds and cells by what they mean (see
+neighbour ranks, Step 1, the enemy spheres, the hypersphere tables (enemy spheres, k-spheres, the
+spheres that contain every object, the checks), the queue with its tie criteria, the iterations
+and their spheres, the counters, D and F with every object's route, the class composition and the
+17 cases — the figures, and the hypersphere explorer. Headers are coloured by what a column holds and cells by what they mean (see
 [Colours](#colours)); the legend under the tabs follows the open table. Hover a cell for its exact
 value.
 
@@ -86,6 +87,30 @@ value.
 ![Step 1](images/gui/results-characteristics.png)
 
 ![Figures](images/gui/results-figure.png)
+
+### Hyperspheres
+
+The **Hyperspheres** tab shows Steps 1–5 as spheres ([Visualizations](visualizations.md),
+ADR-020). Choose a view:
+
+- **the spheres of an object** (Step 1) — the object in the centre, every other object at its
+  true distance; the solid circle is its enemy sphere (the own-class objects inside are filled:
+  g counts them), the dashed one its k-sphere; the table lists everything the two spheres say;
+- **the spheres around Sᵢ in an iteration** (Steps 2–5) — the selected object in the centre and
+  the enemy sphere of every object of its class: solid and yellow when the object is in L, dashed
+  in F but not in L, dotted already in D; the table is the iteration's block of the workbook and
+  the panel beside the figure its summary (L, the counters, the moves, the cases, the check);
+- **the neighbourhood strips** and **the radius plane** of every object.
+
+◀ ▶ step through the objects or the iterations (the iterations end with Step 6, the result);
+**Play** steps by itself and stops at Step 6. A double click on a row of *Step 1*, *Enemy spheres*,
+*k-spheres*, *Covering*, *Step 2 · queue* or *D and F* opens that object's spheres; on a row of
+*Iterations*, *Spheres per iteration* or *Sphere trace*, that iteration's. The explorer keeps its
+view when ERDR runs again.
+
+![The spheres of S₂](images/gui/results-spheres-object.png)
+
+![Iteration 2 as spheres](images/gui/results-spheres-iteration.png)
 
 ## Readings & k
 
@@ -108,7 +133,8 @@ Choose the formats and a folder; the readings comparison and the k sweep can be 
 `scripts\build_exe.py` freezes the application with PyInstaller into `dist\erdr-gui\` (a folder,
 copied as a whole; nothing is installed) and `dist\erdr-gui-<version>-windows.zip`, then runs
 `erdr-gui.exe --self-test` in an empty folder — the built-in default dataset, a run that must give
-the workbook's D, a table, a figure, the readings and every export format (ADR-013). CI builds it
+the workbook's D, a table, a figure, the hypersphere explorer, the readings and every export
+format (ADR-013). CI builds it
 on every push and attaches it to each release.
 
 The screenshots are made by `scripts\gui_screenshots.py`.

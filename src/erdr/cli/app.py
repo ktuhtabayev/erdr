@@ -2,7 +2,8 @@
 
 Commands: ``config`` (show, init, check), ``data`` (list, check, info), ``plugins`` (the
 normalizers, metrics, formats and datasets that can be chosen), ``run`` (ERDR on a dataset: Step
-1, the trace, D and F, the cases; optionally saved and exported), ``readings`` (every reading of
+1, the trace, D and F, the cases; optionally saved and exported), ``spheres`` (Steps 1–5 as
+hyperspheres: every object's spheres, one object or one iteration), ``readings`` (every reading of
 §1.1), ``sweep`` (|D| for many k), ``validate`` (the package against the ERDR workbook),
 ``runs`` and ``export`` (saved run folders) and ``gui`` (the desktop application).
 
@@ -43,13 +44,26 @@ from erdr.data import DATASETS, LOADERS, Dataset, load_from_config
 from erdr.data.catalog import project_catalog, resolve_dataset
 from erdr.errors import ConfigError, ERDRError
 from erdr.export import EXPORTERS, ExportOptions, export_result, resolve_formats
+from erdr.export.figures import (
+    iteration_spheres_figure,
+    object_spheres_figure,
+    run_figure,
+    save_figure,
+)
 from erdr.export.tables import (
     Table,
     cases_table,
     characteristics_table,
+    covering_table,
+    enemy_spheres_table,
+    iteration_detail_table,
+    iteration_spheres_table,
     iterations_table,
+    k_spheres_table,
+    object_spheres_table,
     readings_table,
     routes_table,
+    sphere_checks_table,
     sweep_table,
 )
 from erdr.export.text import display
@@ -384,10 +398,9 @@ NormalizerOption = Annotated[
 ]
 
 
-def _print_run(run: ExperimentResult, *, show_all: bool, trace: bool) -> None:
-    limit = None if show_all else TABLE_ROWS
+def _echo_header(run: ExperimentResult) -> None:
+    """The dataset, the settings and a ⚠ line for every reading that is not the literal one."""
     result = run.result
-    names = run.object_names
     typer.echo(
         f"{run.dataset.name}  (m = {run.dataset.m}, n = {run.dataset.n})  ·  k = {run.k}  ·  "
         f"{result.readings.label}"
@@ -401,6 +414,13 @@ def _print_run(run: ExperimentResult, *, show_all: bool, trace: bool) -> None:
     for warning in run.warnings:
         typer.echo(paint(f"⚠ {warning}", "warning"))
     typer.echo("")
+
+
+def _print_run(run: ExperimentResult, *, show_all: bool, trace: bool) -> None:
+    limit = None if show_all else TABLE_ROWS
+    result = run.result
+    names = run.object_names
+    _echo_header(run)
     if trace:
         echo_table(characteristics_table(run), limit=limit)
         echo_table(iterations_table(run), limit=limit)
@@ -480,6 +500,97 @@ def run(
             target = out or (folder / "export" if folder else Path("exports"))
             files = export_result(experiment, target, resolve_formats(export))
             typer.echo(f"exported {len(files)} files to {target}")
+    except (ERDRError, ValueError) as error:
+        raise _fail(error if isinstance(error, ERDRError) else ConfigError(str(error))) from error
+
+
+# ---------------------------------------------------------------- erdr spheres
+
+
+def _object_index(text: str, names: Sequence[str]) -> int:
+    """An object named ``S₁``, ``S1`` or ``1`` (1-based), or by its id in the dataset.
+
+    Raises:
+        ConfigError: No such object.
+    """
+    if text in names:
+        return list(names).index(text)
+    digits = (
+        text.strip().upper().removeprefix("S").translate(str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
+    )
+    if digits.isdigit() and 1 <= int(digits) <= len(names):
+        return int(digits) - 1
+    raise ConfigError(f"no object {text!r}: give S1 … S{len(names)}, a number or an object id")
+
+
+@app.command("spheres")
+def spheres(
+    source: DatasetArgument = None,
+    config_path: ConfigOption = None,
+    preset_name: PresetOption = None,
+    k: KOption = None,
+    reading: ReadingOption = None,
+    z_scope: ZOption = None,
+    metric: MetricOption = None,
+    normalizer: NormalizerOption = None,
+    k_rule: Annotated[str | None, typer.Option("--k-rule", help="enforce, warn or off.")] = None,
+    obj: Annotated[
+        str | None,
+        typer.Option("--object", "-s", help="One object: S1, 1 or its id — its two spheres."),
+    ] = None,
+    iteration: Annotated[
+        int | None,
+        typer.Option("--iteration", "-t", help="One iteration t — the spheres around its Sᵢ."),
+    ] = None,
+    figure: Annotated[
+        Path | None,
+        typer.Option("--figure", "-f", help="Save the matching figure (.png or .svg)."),
+    ] = None,
+    show_all: Annotated[bool, typer.Option("--all", help="Show every row of long tables.")] = False,
+) -> None:
+    """Steps 1–5 as hyperspheres: every object's spheres, one object or one iteration."""
+    try:
+        config, base = _config(config_path)
+        config = _with_overrides(
+            config,
+            preset_name=preset_name,
+            k=k,
+            epsilon=None,
+            reading=reading,
+            z_scope=z_scope,
+            metric=metric,
+            normalizer=normalizer,
+            k_rule=k_rule,
+        )
+        experiment = run_experiment(config, _dataset(source, config, base))
+        if obj is not None and iteration is not None:
+            raise ConfigError("choose --object or --iteration, not both")
+        limit = None if show_all else TABLE_ROWS
+        _echo_header(experiment)
+        if obj is not None:
+            index = _object_index(obj, experiment.object_names)
+            echo_table(object_spheres_table(experiment, index), limit=None)
+            drawing = object_spheres_figure(experiment, index)
+        elif iteration is not None:
+            if iteration < 1:
+                raise ConfigError(f"iterations start at 1, got {iteration}")
+            detail = iteration_detail_table(experiment, iteration)
+            echo_table(detail, limit=limit)
+            for name, value in detail.extra.items():
+                typer.echo(f"{name}: {value}")
+            drawing = iteration_spheres_figure(experiment, iteration)
+        else:
+            for table in (
+                enemy_spheres_table(experiment),
+                k_spheres_table(experiment),
+                covering_table(experiment),
+                sphere_checks_table(experiment),
+                iteration_spheres_table(experiment),
+            ):
+                echo_table(table, limit=limit)
+            drawing = run_figure("hyperspheres", experiment)
+        if figure is not None:
+            typer.echo(f"figure saved: {save_figure(drawing, figure)}")
     except (ERDRError, ValueError) as error:
         raise _fail(error if isinstance(error, ERDRError) else ConfigError(str(error))) from error
 

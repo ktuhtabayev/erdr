@@ -33,7 +33,7 @@ flowchart TB
 
 | Package | Role |
 |---|---|
-| `erdr.core` | normalizers, metrics, Step 0 pipeline, sorted neighbours, the k rule, Step 1, Steps 2–6 with a replayable trace, readings, cases, plug-in registries |
+| `erdr.core` | normalizers, metrics, Step 0 pipeline, sorted neighbours, the k rule, Step 1, Steps 2–6 with a replayable trace, Steps 1–5 as hyperspheres, readings, cases, plug-in registries |
 | `erdr.config` | typed configuration (pydantic v2), presets, YAML/TOML/JSON, canonical hash |
 | `erdr.data` | `Dataset`, loaders (extended layout, CSV, Excel, ERDR workbook, Parquet), writers, the `datasets` folder, built-in datasets |
 | `erdr.services` | runner, run folders, readings comparison and k sweeps, dataset summaries, workbook validation |
@@ -56,6 +56,8 @@ flowchart LR
     L --> R["Step 6: D, F = E₀ \ D"]
     L --> T["trace: one record per iteration"]
     T --> K["17 cases"]
+    C --> H["hyperspheres: enemy sphere and k-sphere<br/>of every object"]
+    T --> H2["the spheres around Sᵢ in every iteration<br/>(L = the sphere test)"]
 ```
 
 ## The trace
@@ -79,7 +81,8 @@ flowchart LR
     F --> H
     F --> P["png · svg"]
     T --> G["GUI table models"]
-    F --> G2["GUI figure canvas"]
+    F --> G2["GUI figure canvas · hypersphere explorer"]
+    F --> A["figures/iteration-spheres.gif"]
 ```
 
 A table cell carries a *mark* — what it means (class K1, training sample, selected object, counter

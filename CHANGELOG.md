@@ -5,6 +5,40 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Steps 1–5 as hyperspheres, from the ERDR workbook's new sheets *Hyperspheres (Step 1)*,
+  *Hyperspheres (Iterations)* and *Hypersphere Data* (ADR-020): `erdr.core.hyperspheres` computes
+  every object's enemy sphere (r, the own class strictly inside and on it, the closed count) and
+  k-sphere (its members, the rank e of the nearest enemy, q = min(r, z)/max(r, z) and
+  d = (1 − q)/(1 + q)), the spheres that contain every object, and in every iteration the spheres
+  around the selected Sᵢ — L is exactly the sphere test r(Sⱼ) − ρ(Sⱼ, Sᵢ) > 0 with g > 1 and the
+  readings A and B.
+- Tables: *enemy-spheres*, *k-spheres*, *covering*, *sphere-checks*, *iteration-spheres* and
+  *sphere-trace* (every object in every iteration, for samples up to 60 objects), in every export,
+  the Results page and the `erdr` command.
+- Figures in the project's style: the spheres of every object on one scale, the neighbourhood
+  strips, the radius plane (r, z) with its lines of equal d, the spheres around Sᵢ in every
+  iteration; the object and iteration diagrams one by one in `figures/hyperspheres/` and
+  `figures/iteration-spheres/`, and the iterations as an animation,
+  `figures/iteration-spheres.gif`. In Excel they stand on the *Hyperspheres* sheets, in the HTML
+  report before their tables.
+- The **Hyperspheres** tab of the Results page: the spheres of any object or iteration, the strips
+  and the radius plane, with ◀ ▶ and *Play*, the matching table, legend and summary; a double click
+  on an object's or an iteration's row opens it there.
+- `erdr spheres` — every object's spheres, one object's (`--object`) or one iteration's
+  (`--iteration`), and the figure (`--figure`).
+- `erdr validate` compares the three new sheets too: 2,927 checks (937 before), all passing.
+- *Visualizations* in the documentation: every figure, what it shows, how to read it and where it
+  is; `scripts\doc_figures.py` draws its images.
+
+### Fixed
+
+- A figure shown after the canvas was laid out kept its own size, so the canvas could clip it; it
+  now gets the canvas's size.
+- The Results page cleared its tabs before deleting them, so the tables of earlier runs were kept
+  in memory; they are deleted now.
+
 ## [0.3.0] — 2026-10-11 — colour categories: one colour per meaning
 
 ### Added

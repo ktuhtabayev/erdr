@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QModelIndex, Qt
 from pytestqt.qtbot import QtBot
 
 from erdr.core.metrics import METRICS
@@ -331,3 +331,56 @@ def test_a_second_run_replaces_the_tabs(loaded: MainWindow, run: Run, qapp):
     loaded.zoom(1)
     loaded.toggle_theme()
     loaded.zoom(0)
+
+
+def test_hypersphere_explorer(loaded: MainWindow, run: Run, qtbot: QtBot):
+    page = loaded.results_page
+    explorer = page.explorer
+    run(loaded)
+    page.show_tab("explorer")
+    assert page.tabs.currentWidget() is explorer
+    assert explorer.view == "object"
+    assert explorer.item_choice.count() == 7
+    assert explorer.table is not None
+    assert explorer.table.key == "object-spheres-1"
+    explorer.step(1)
+    assert explorer.table.key == "object-spheres-2"
+    explorer.step(-2)
+    assert explorer.table.key == "object-spheres-7"  # ◀ wraps around
+    explorer.show_iteration(2)
+    assert explorer.view == "iteration"
+    assert explorer.item_choice.count() == 7  # six iterations and Step 6
+    assert explorer.table.key == "iteration-spheres-2"
+    assert "S₇ (Step 5)" in explorer.summary.text()
+    assert explorer.figure_view.figure.axes
+    explorer.show_iteration(7)
+    assert "Training sample D" in explorer.summary.text()
+    explorer.show_iteration(5)
+    explorer.play(True)
+    assert explorer.timer.isActive()
+    assert explorer.play_button.text() == "Pause"
+    explorer._advance()
+    assert explorer.table.key == "iteration-spheres-6"
+    explorer._advance()
+    explorer._advance()  # at Step 6 the play stops
+    assert not explorer.timer.isActive()
+    assert explorer.play_button.text() == "Play"
+    for view in ("strips", "plane"):
+        explorer.view_choice.setCurrentIndex(explorer.view_choice.findData(view))
+        assert not explorer.item_choice.isEnabled()
+        assert explorer.figure_view.figure.axes
+        assert explorer.legend.marks
+    # a double click on an object's or an iteration's row opens its spheres
+    page.show_tab("queue")
+    view = page.views["queue"]
+    page._open_spheres("queue", view.model().index(1, 1))  # position 2: S₃
+    assert page.tabs.currentWidget() is explorer
+    assert explorer.table is not None
+    assert explorer.table.title.endswith("S₃")
+    page._open_spheres("iterations", page.views["iterations"].model().index(3, 0))
+    assert explorer.table.key == "iteration-spheres-4"
+    page._open_spheres("iterations", QModelIndex())  # nothing for an invalid cell
+    assert explorer.table.key == "iteration-spheres-4"
+    loaded.state.set_result(None)
+    assert explorer.result is None
+    assert "Run ERDR" in explorer.summary.text()

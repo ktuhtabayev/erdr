@@ -39,7 +39,11 @@ def test_every_sheet_of_the_workbook_matches():
     sections = {name: total for name, total, _ in report.sections()}
     assert sections["Validation"] == 53  # the workbook's own 53 checks
     assert sections["Article Table 1 Check"] == 90
-    assert len(report.checks) == 937
+    # the hypersphere sheets: spheres of Step 1, every iteration's block, the diagrams' geometry
+    assert sections["Hyperspheres (Step 1)"] == 235
+    assert sections["Hyperspheres (Iterations)"] == 805
+    assert sections["Hypersphere Data"] == 950
+    assert len(report.checks) == 2927
 
 
 def test_step1_values(default_run: ExperimentResult):

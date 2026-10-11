@@ -23,6 +23,28 @@ import numpy as np
 
 from erdr.config.models import ERDRConfig, ExperimentConfig, ReadingsConfig
 from erdr.core.algorithm import ERDRResult, run_erdr
+from erdr.core.hyperspheres import (
+    RATIO_LINES,
+    SEPARATOR,
+    WIDE,
+    angle_step,
+    containing_text,
+    cover_change_text,
+    density_text,
+    iteration_spheres,
+    iteration_summary,
+    iteration_title,
+    object_title,
+    possible_cover,
+    radial_layout,
+    ratio_from_priority,
+    ratio_line,
+    ray_length,
+    relation_meaning,
+    sphere_profile,
+    step1_summary,
+    strip_levels,
+)
 from erdr.core.readings import CLOSEST, LITERAL, Readings, ZScope, all_readings
 from erdr.data.loaders import load_dataset
 from erdr.data.schema import Dataset, FeatureType
@@ -126,6 +148,10 @@ class _Sheets:
     def cell(self, sheet: str, row: int, column: int) -> Any:
         """Value of the cell at 1-based (row, column)."""
         return self._book[sheet].cell(row=row, column=column).value
+
+    def rows(self, sheet: str) -> int:
+        """The last used row of ``sheet``."""
+        return int(self._book[sheet].max_row)
 
     def close(self) -> None:
         self._book.close()
@@ -317,6 +343,332 @@ def _check_step1(sheets: _Sheets, run: ExperimentResult, out: _Collector) -> Non
                 sheets.cell("Priority Queue", row, 7),
                 _DECIDED[decided[position]],
             )
+
+
+HYPERSPHERES_STEP1 = "Hyperspheres (Step 1)"
+HYPERSPHERES_ITERATIONS = "Hyperspheres (Iterations)"
+HYPERSPHERE_DATA = "Hypersphere Data"
+
+
+def _label(run: ExperimentResult, i: int) -> object:
+    """The class label of object ``i`` as the workbook stores it (an integer for 1, 2)."""
+    value = run.dataset.y[i].item()
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+def _check_hyperspheres_step1(sheets: _Sheets, run: ExperimentResult, out: _Collector) -> None:
+    """*Hyperspheres (Step 1)*: enemy spheres, k-spheres, the spheres that contain Sᵢ, checks."""
+    section = HYPERSPHERES_STEP1
+    if not sheets.has(section):
+        return
+    names = _names(run.dataset)
+    result = run.result
+    c = result.characteristics
+    p = sphere_profile(run.distances.matrix, c, decimals=run.config.erdr.d_decimals)
+    for i in range(c.m):
+        name = names[i]
+        row = 5 + i
+        g = int(c.g[i])
+        inside = [names[j] for j in c.order[i] if c.spheres[i, j]]
+        boundary = int(p.strictly_inside[i]) == g
+        for column, what, value in (
+            (4, "nearest enemy", names[c.nearest_enemy[i]]),
+            (5, "own class inside", int(p.own_inside[i])),
+            (6, "own class on the sphere", int(p.own_on_sphere[i])),
+            (7, "enemies inside", int(p.enemies_inside[i])),
+            (8, "enemies on the sphere", int(p.enemies_on_sphere[i])),
+            (9, "g", g),
+            (10, "g = Step 1", int(g == int(p.g_from_spheres[i]))),
+            (11, "closed count", int(p.closed_count[i])),
+            (12, "closed count − on the sphere = g", int(boundary)),
+            (13, "members", ", ".join([f"{name} (itself)", *inside])),
+            (14, "reading", density_text(g, int(p.own_on_sphere[i]))),
+        ):
+            out.exact(
+                section,
+                f"enemy sphere of {name} · {what}",
+                sheets.cell(section, row, column),
+                value,
+            )
+        out.number(section, f"enemy sphere of {name} · r", sheets.cell(section, row, 3), c.r[i])
+
+        row = 15 + i
+        relation = p.relation[i]
+        agrees = abs(float(p.d_from_ratio[i]) - float(c.d[i])) < 1e-9
+        for column, what, value in (
+            (3, "k-th neighbour", names[c.kth_neighbour[i]]),
+            (6, "neighbours in the k-sphere", int(p.k_members[i])),
+            (7, "own class in the k-sphere", int(p.k_own[i])),
+            (8, "enemies in the k-sphere", int(p.k_enemies[i])),
+            (9, "rank e of the nearest enemy", int(c.enemy_rank[i])),
+            (12, "d = Step 1", int(agrees)),
+            (13, "relation", relation.value),
+            (14, "meaning", relation_meaning(relation, int(c.enemy_rank[i]), c.k, c.z_scope)),
+        ):
+            out.exact(
+                section, f"k-sphere of {name} · {what}", sheets.cell(section, row, column), value
+            )
+        for column, what, number in (
+            (4, "z", float(c.z[i])),
+            (5, "r", float(c.r[i])),
+            (10, "q", float(p.ratio[i])),
+            (11, "d from q", float(p.d_from_ratio[i])),
+        ):
+            out.number(
+                section, f"k-sphere of {name} · {what}", sheets.cell(section, row, column), number
+            )
+
+        row = 25 + i
+        spheres = p.spheres_containing(i)
+        selected_in = result.routes[i].processed_in
+        it = result.iterations[selected_in - 1] if selected_in is not None else None
+        possible = possible_cover(g, len(spheres), result.readings)
+        for column, what, value in (
+            (3, "g", g),
+            (4, "spheres that contain it", containing_text(spheres, i, names)),
+            (8, "number of spheres", len(spheres)),
+            (9, "selected in", selected_in if selected_in is not None else DASH),
+            (10, "L then", object_set(it.L, names) if it else f"{DASH} never selected"),
+            (13, "|L| then", len(it.L) if it else DASH),
+            (
+                14,
+                "change from the start",
+                cover_change_text(selected_in, len(it.L) if it else 0, possible, result.readings),
+            ),
+        ):
+            out.exact(section, f"{name} covered · {what}", sheets.cell(section, row, column), value)
+
+    for offset, line in enumerate(step1_summary(c, p, tuple(names))):
+        row = 35 + offset
+        out.exact(section, f"{line.label} · value", sheets.cell(section, row, 5), line.value)
+        out.exact(section, f"{line.label} · objects", sheets.cell(section, row, 6), line.text)
+
+
+def _iteration_rows(sheets: _Sheets, section: str) -> dict[int, int]:
+    """Iteration t → the row of its block title (``Iteration t  ·  …``) on ``section``."""
+    found: dict[int, int] = {}
+    for row in range(1, sheets.rows(section) + 1):
+        value = sheets.cell(section, row, 1)
+        if isinstance(value, str) and value.startswith("Iteration "):
+            number = value.removeprefix("Iteration ").split(SEPARATOR, 1)[0].strip()
+            if number.isdigit():
+                found.setdefault(int(number), row)
+    return found
+
+
+def _iteration_heading(run: ExperimentResult, t: int) -> str:
+    names = _names(run.dataset)
+    if t > len(run.result.iterations):
+        return iteration_title(t, None)
+    it = run.result.iterations[t - 1]
+    return iteration_title(t, names[it.selected], object_set(it.L, names), it.decision.value)
+
+
+def _check_hyperspheres_iterations(sheets: _Sheets, run: ExperimentResult, out: _Collector) -> None:
+    """*Hyperspheres (Iterations)*: the overview and every iteration's block of spheres."""
+    section = HYPERSPHERES_ITERATIONS
+    if not sheets.has(section):
+        return
+    names = _names(run.dataset)
+    result = run.result
+    matrix = run.distances.matrix
+    last = len(result.iterations)
+    m = result.m
+    for t in range(1, m + 1):  # the overview: one row per possible iteration
+        row = 6 + t
+        label = f"overview t = {t}"
+        if t > last:
+            out.exact(section, f"{label} · selected", sheets.cell(section, row, 2), "— stop")
+            out.exact(
+                section, f"{label} · decision", sheets.cell(section, row, 15), "Step 6 · stop"
+            )
+            continue
+        it = result.iterations[t - 1]
+        view = iteration_spheres(result, matrix, t)
+        moved = moves_text([(mv.object, mv.step) for mv in it.moves], names)
+        for column, what, value in (
+            (2, "selected", names[it.selected]),
+            (3, "class", _label(run, it.selected)),
+            (5, "candidates", object_set(view.candidates, names)),
+            (8, "spheres that contain Sᵢ", object_set(view.covering, names)),
+            (11, "in D, would contain Sᵢ", object_set(view.covering_in_d, names)),
+            (13, "L", object_set(it.L, names)),
+            (14, "|L|", len(it.L)),
+            (15, "decision", it.decision.value + ("" if moved == DASH else f"{SEPARATOR}{moved}")),
+        ):
+            out.exact(section, f"{label} · {what}", sheets.cell(section, row, column), value)
+        out.number(section, f"{label} · r(Sᵢ)", sheets.cell(section, row, 4), it.r)
+
+    for t, top in _iteration_rows(sheets, section).items():
+        label = f"iteration {t}"
+        out.exact(
+            section, f"{label} · title", sheets.cell(section, top, 1), _iteration_heading(run, t)
+        )
+        view = iteration_spheres(result, matrix, t)
+        for j in range(m):
+            row = top + 2 + j
+            where = f"{label} · {names[j]}"
+            step = int(view.moved_by[j])
+            for column, what, value in (
+                (2, "class", _label(run, j)),
+                (3, "in F", int(view.in_f[j])),
+                (4, "own class", int(view.own_class[j])),
+                (8, "contains Sᵢ", int(view.contains[j])),
+                (9, "g before", int(view.g_before[j])),
+                (10, "g > 1", int(view.g_before[j] > 1)),
+                (11, "allowed (A, B)", int(view.allowed[j])),
+                (12, "in L", int(view.in_l[j])),
+                (13, "g after", int(view.g_after[j])),
+                (14, "moves to D", f"Step {step}" if step else ""),
+                (15, "role", view.role(j)),
+            ):
+                expected = sheets.cell(section, row, column)
+                out.exact(section, f"{where} · {what}", "" if expected is None else expected, value)
+            out.number(section, f"{where} · r(Sⱼ)", sheets.cell(section, row, 6), view.radius[j])
+            if view.stop:
+                for column, what in ((5, "ρ(Sⱼ, Sᵢ)"), (7, "r − ρ")):
+                    out.exact(section, f"{where} · {what}", sheets.cell(section, row, column), DASH)
+            else:
+                out.number(
+                    section, f"{where} · ρ(Sⱼ, Sᵢ)", sheets.cell(section, row, 5), view.distance[j]
+                )
+                out.number(
+                    section, f"{where} · r − ρ", sheets.cell(section, row, 7), view.margin[j]
+                )
+        summary = iteration_summary(result, view, run.cases, tuple(names))
+        for offset, (what, text) in enumerate(summary):
+            out.exact(
+                section, f"{label} · {what}", sheets.cell(section, top + 10 + offset, 5), text
+            )
+
+
+def _check_hypersphere_data(sheets: _Sheets, run: ExperimentResult, out: _Collector) -> None:
+    """*Hypersphere Data*: the geometry of every diagram (positions, strips, radius plane)."""
+    section = HYPERSPHERE_DATA
+    if not sheets.has(section):
+        return
+    names = _names(run.dataset)
+    result = run.result
+    c = result.characteristics
+    matrix = run.distances.matrix
+    m = c.m
+    largest = float(matrix.max())
+    out.number(section, "ρ_max", sheets.cell(section, 5, 2), largest)
+    out.number(section, "angle step 2π / (N − 1)", sheets.cell(section, 6, 2), angle_step(m))
+    out.exact(section, "k", sheets.cell(section, 9, 2), c.k)
+    length = ray_length(c)
+    out.number(section, "ray length of the radius plane", sheets.cell(section, 11, 2), length)
+
+    counted = c.spheres & ~np.eye(m, dtype=bool)  # own class strictly inside, the centre apart
+    for i in range(m):  # the radial diagram of every object
+        top = 32 + 29 * i
+        title = object_title(
+            names[i], str(_label(run, i)), int(c.g[i]), float(c.d[i]), int(c.position[i])
+        )
+        out.exact(
+            section, f"diagram of {names[i]} · title", sheets.cell(section, top + 1, 2), title
+        )
+        layout = radial_layout(matrix, c, i)
+        x, y = layout.xy(largest)
+        for j in range(m):
+            row = top + 3 + j
+            where = f"diagram of {names[i]} · {names[j]}"
+            out.exact(section, f"{where} · rank", sheets.cell(section, row, 3), int(layout.rank[j]))
+            out.exact(
+                section, f"{where} · counted in g", sheets.cell(section, row, 8), int(counted[i, j])
+            )
+            for column, what, number in (
+                (4, "ρ", float(layout.distance[j])),
+                (5, "θ", float(layout.angle[j])),
+                (6, "x", float(x[j])),
+                (7, "y", float(y[j])),
+            ):
+                out.number(section, f"{where} · {what}", sheets.cell(section, row, column), number)
+
+    levels = strip_levels(c)
+    for i in range(m):  # the neighbourhood strips
+        label = f"{names[i]}{SEPARATOR}d {float(c.d[i]):.3f}"
+        out.exact(section, f"strip of {names[i]} · label", sheets.cell(section, 237 + i, 27), label)
+        out.exact(
+            section,
+            f"strip of {names[i]} · level",
+            sheets.cell(section, 237 + i, 29),
+            int(levels[i]),
+        )
+        for j in range(m):
+            row = 237 + m * i + j
+            where = f"strip of {names[i]} · {names[j]}"
+            out.number(section, f"{where} · x = ρ", sheets.cell(section, row, 3), matrix[i, j])
+            out.exact(section, f"{where} · level", sheets.cell(section, row, 4), int(levels[i]))
+            out.exact(
+                section, f"{where} · counted in g", sheets.cell(section, row, 6), int(counted[i, j])
+            )
+
+    groups: dict[int, str] = {}
+    for i in range(m):  # the radius plane: a point (r, z) per object, objects sharing it together
+        sharing = [j for j in range(m) if c.r[j] == c.r[i] and c.z[j] == c.z[i]]
+        groups[i] = ", ".join(f"{names[j]} ({int(c.position[j])})" for j in sharing)
+    for i in range(m):
+        row = 290 + i
+        where = f"radius plane · {names[i]}"
+        out.number(section, f"{where} · r", sheets.cell(section, row, 2), c.r[i])
+        out.number(section, f"{where} · z", sheets.cell(section, row, 3), c.z[i])
+        out.exact(
+            section, f"{where} · queue position", sheets.cell(section, row, 5), int(c.position[i])
+        )
+        out.exact(section, f"{where} · label", sheets.cell(section, row, 11), groups[i])
+    row = 290
+    for d in RATIO_LINES:  # lines of equal d: d = 0 is z = r, every other d two lines
+        q = ratio_from_priority(d)
+        below, above = ratio_line(d, length)
+        sides = ((1.0, (length, length)),) if d == 0 else ((q, below), (1.0 / q, above))
+        for slope, end in sides:
+            where = f"radius plane · d = {d:g}, z / r = {slope:.4f}"
+            out.number(section, f"{where} · slope", sheets.cell(section, row, 16), slope)
+            out.number(section, f"{where} · end x", sheets.cell(section, row + 1, 17), end[0])
+            out.number(section, f"{where} · end y", sheets.cell(section, row + 1, 18), end[1])
+            row += 2
+
+    last = len(result.iterations)
+    for t in range(1, m + 1):  # the iteration diagrams
+        top = 307 + 29 * (t - 1)
+        label = f"iteration diagram {t}"
+        out.exact(
+            section,
+            f"{label} · title",
+            sheets.cell(section, top + 1, 2),
+            _iteration_heading(run, t),
+        )
+        selected = result.iterations[t - 1].selected + 1 if t <= last else 0
+        out.exact(section, f"{label} · selected", sheets.cell(section, top + 1, 17), selected)
+        if t > last:
+            continue
+        view = iteration_spheres(result, matrix, t)
+        i = result.iterations[t - 1].selected
+        layout = radial_layout(matrix, c, i)
+        for j in range(m):
+            row = top + 3 + j
+            where = f"{label} · {names[j]}"
+            for column, what, value in (
+                (3, "in F", int(view.in_f[j])),
+                (4, "own class", int(view.own_class[j])),
+                (5, "centre", int(j == i)),
+                (6, "rank around Sᵢ", int(layout.rank[j])),
+                (19, "in L", int(view.in_l[j])),
+                (20, "g before", int(view.g_before[j])),
+                (21, "g after", int(view.g_after[j])),
+                (23, "moves to D", int(view.moved_by[j] > 0)),
+            ):
+                out.exact(section, f"{where} · {what}", sheets.cell(section, row, column), value)
+            out.number(
+                section, f"{where} · ρ(Sⱼ, Sᵢ)", sheets.cell(section, row, 7), view.distance[j]
+            )
+            out.number(section, f"{where} · r(Sⱼ)", sheets.cell(section, row, 8), view.radius[j])
+    message = (
+        f"Queue empty → Step 6:   D = {object_set(result.training, names)}"
+        f"{WIDE}F = {object_set(result.validation, names)}"
+    )
+    out.exact(section, "Step 6 message", sheets.cell(section, 317, 4), message)
 
 
 def _check_trace(sheets: _Sheets, run: ExperimentResult, out: _Collector) -> None:
@@ -589,7 +941,10 @@ _STEPS: tuple[Callable[[_Sheets, ExperimentResult, _Collector], None], ...] = (
     _check_inputs,
     _check_step0,
     _check_step1,
+    _check_hyperspheres_step1,
     _check_trace,
+    _check_hyperspheres_iterations,
+    _check_hypersphere_data,
     _check_result,
     _check_readings,
     _check_table1,

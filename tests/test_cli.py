@@ -157,3 +157,32 @@ def test_runs_and_export(tmp_path: Path):
     )
     assert code == 0, out
     assert "exported" in out
+
+
+def test_spheres_command(tmp_path: Path):
+    code, out = invoke("spheres")
+    assert code == 0
+    assert "Step 1 · Enemy spheres" in out
+    assert "border object — it can never cover" in out
+    assert "Steps 2–5 · Spheres around the selected Sᵢ" in out
+    code, out = invoke("spheres", "--object", "S2", "--figure", str(tmp_path / "s2.svg"))
+    assert code == 0
+    assert "The spheres of S₂" in out
+    assert (tmp_path / "s2.svg").is_file()
+    code, out = invoke("spheres", "-t", "2", "-f", str(tmp_path / "t2.png"))
+    assert code == 0
+    assert "Moved to D: S₇ (Step 5)" in out
+    assert (tmp_path / "t2.png").is_file()
+    code, out = invoke("spheres", "-t", "9")
+    assert "queue empty → Step 6" in out
+    code, out = invoke("spheres", "-p", "closest", "heart-disease-270", "-t", "1")
+    assert code == 0
+    assert "⚠ not the literal article reading" in out
+    assert invoke("spheres", "--object", "S99")[0] == 2
+    assert invoke("spheres", "-t", "0")[0] == 2
+    assert invoke("spheres", "-s", "1", "-t", "1")[0] == 2
+    code, out = invoke("spheres", "--object", "4", "-f", str(tmp_path / "s4.png"))
+    assert code == 0
+    assert "The spheres of S₄" in out
+    code, out = invoke("spheres", "-f", str(tmp_path / "all.png"))
+    assert (tmp_path / "all.png").is_file()

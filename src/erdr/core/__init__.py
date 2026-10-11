@@ -8,6 +8,8 @@ Every public function names the article step it implements:
   :mod:`.k_rule`;
 * Steps 2–6 — :mod:`.algorithm` (queue, L, blocking, counters, D and F) with the readings of the
   open points in :mod:`.readings`;
+* :mod:`.hyperspheres` — Steps 1–5 as hyperspheres: the enemy sphere and the k-sphere of every
+  object, the spheres around the selected object of every iteration, the diagrams' layout;
 * :mod:`.cases` — the 17 cases of the workbook's checklist.
 
 :mod:`.registry` provides the plug-in mechanism.

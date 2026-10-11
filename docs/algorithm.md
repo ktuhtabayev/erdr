@@ -76,6 +76,51 @@ object to D before its turn). An empty queue ends the loop (Step 6).
 Every iteration blocks one object, so ERDR stops after at most m iterations. Blocked objects stay
 in F: they can still be members of L and can still move to D later.
 
+## Steps 1–5 as hyperspheres
+
+*Module `erdr.core.hyperspheres` · sheets* Hyperspheres (Step 1), Hyperspheres (Iterations),
+Hypersphere Data · [all the figures](visualizations.md).
+
+Step 1 in geometric terms: every object Sᵢ is the centre of two spheres of the metric ρ.
+
+| Sphere | Radius | What it holds |
+|---|---|---|
+| enemy sphere (Sᵢ, r(Sᵢ)) — **open** | r(Sᵢ), through the nearest enemy | no enemy strictly inside; g(Sᵢ) counts the own class strictly inside, Sᵢ itself included |
+| k-sphere (Sᵢ, z(Sᵢ, k)) — **closed** | z(Sᵢ, k), through the k-th neighbour | the k nearest neighbours (more on a tie) |
+
+Objects *on* the enemy sphere (ρ = r) are not counted, so a closed count ρ ≤ r differs from g by
+exactly them. d compares the two radii only:
+
+```text
+q = min(r, z) / max(r, z)          d = |z − r| / (z + r) = (1 − q) / (1 + q)
+```
+
+d does not change when every distance is scaled; z = r ⇔ d = 0, and the Step 2 queue starts with
+the objects whose two spheres are closest in size. On the **radius plane** (r, z) d is constant on
+every line through the origin. With z over every class, the rank e of the nearest enemy decides:
+e = k ⇔ z = r, z < r gives g ≥ k + 1 and z > r gives g ≤ k − 1.
+
+![The spheres of S₂](images/figures/object-2.png)
+
+Steps 2–5 never change a sphere — only F and the counters g. The **inverse view** of the sphere
+matrix (its column of Sᵢ) lists the spheres that contain Sᵢ; when Sᵢ is selected, those of its
+own class still in F, with g > 1 and allowed by the readings A and B, form L:
+
+```text
+Sⱼ ∈ L  ⇔  Sⱼ ∈ F ∩ K_t  and  r(Sⱼ) − ρ(Sⱼ, Sᵢ) > 0  and  g(Sⱼ) > 1  and  allowed by A, B
+```
+
+The iteration diagrams put Sᵢ in the centre and every object at its true distance ρ(Sⱼ, Sᵢ), so
+the sphere of Sⱼ contains the centre exactly when ρ(Sⱼ, Sᵢ) < r(Sⱼ): the spheres in L are solid
+and yellow, the others in F dashed, those of objects already in D dotted.
+
+![Iteration 2 as spheres](images/figures/iteration-2.png)
+
+If an object coincides with an enemy, r = 0 and g = 0 (ADR-008): the object is not inside its own
+empty sphere, so in general g = [r > 0] + the own class strictly inside. The validator compares
+every value of the three sheets, and a property test checks on random samples with ties that the
+sphere test gives exactly the engine's L in every iteration (ADR-020).
+
 ## Step 6 · the result
 
 ```text

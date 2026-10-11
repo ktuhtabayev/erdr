@@ -24,4 +24,5 @@ tests/data/** -text
 *.png  binary
 *.jpg  binary
 *.jpeg binary
+*.gif  binary
 *.ico  binary
