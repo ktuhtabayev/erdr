@@ -1,0 +1,358 @@
+"""Configure page: Step 0 (normalizer, metric), Steps 1–6 (k, ε) and the readings A, B, C, z."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSpinBox,
+    QWidget,
+)
+
+from erdr.config.io import load_config, save_config
+from erdr.config.models import (
+    DistanceConfig,
+    ERDRConfig,
+    ExperimentConfig,
+    PluginSpec,
+    PreprocessingConfig,
+    ReadingsConfig,
+)
+from erdr.config.presets import PresetName, matching_preset, preset, reading_notes
+from erdr.core.k_rule import permitted_k
+from erdr.core.metrics import METRICS, traits_of
+from erdr.core.normalizers import NORMALIZERS
+from erdr.core.readings import BlockedCover, SelfInL, Step5Return, ZScope
+from erdr.data.schema import Dataset
+from erdr.errors import ERDRError
+from erdr.gui.forms import ParamsForm
+from erdr.gui.state import AppState
+from erdr.gui.widgets import Page
+
+CONFIG_FILTER = "Configurations (*.yaml *.yml *.toml *.json);;All files (*)"
+READING_CHOICES: dict[str, list[tuple[str, Any]]] = {
+    "self_in_l": [
+        ("A = 1 · Sᵢ is in its own L when g(Sᵢ) > 1 (literal)", SelfInL.INCLUDED),
+        ("A = 2 · only other objects form L", SelfInL.EXCLUDED),
+    ],
+    "blocked_cover": [
+        ("B = 1 · processed objects keep covering (literal)", BlockedCover.KEPT),
+        ("B = 2 · only waiting objects (and Sᵢ) can be in L", BlockedCover.DROPPED),
+    ],
+    "step5_return": [
+        ("C = 1 · back to Step 2 after the whole L (literal)", Step5Return.AFTER_ALL),
+        ("C = 2 · back to Step 2 after the first move", Step5Return.FIRST_MOVE),
+    ],
+    "z_scope": [
+        ("z(Sᵢ, k) over neighbours of any class (workbook)", ZScope.ALL),
+        ("z(Sᵢ, k) over the own class only", ZScope.OWN_CLASS),
+    ],
+}
+
+
+class ConfigurePage(Page):
+    """Edit the experiment configuration; every change goes to the shared state at once."""
+
+    title = "Configure"
+    explanation = (
+        "The defaults reproduce the ERDR workbook: min–max scaling, the Zhuravlev metric, k = 3, "
+        "ε = 0.001 and the literal reading of §1.1 (A = B = C = 1). The article leaves three "
+        "points open; the readings A, B, C and the scope of z switch between them — a reading "
+        "other than the literal one is flagged everywhere."
+    )
+
+    def __init__(
+        self, state: AppState, report: Callable[[str, str], None], parent: QWidget | None = None
+    ) -> None:
+        """The editors, grouped by the steps of the algorithm."""
+        super().__init__(parent)
+        self.state = state
+        self.report = report
+        self._loading = False
+
+        top = QHBoxLayout()
+        self.preset = QComboBox()
+        for name in PresetName:
+            self.preset.addItem(name.value, name)
+        self.preset.addItem("custom", None)
+        self.load_button = QPushButton("Load…")
+        self.save_button = QPushButton("Save…")
+        self.reset_button = QPushButton("Reset")
+        top.addWidget(QLabel("Preset:"))
+        top.addWidget(self.preset)
+        top.addStretch(1)
+        for button in (self.load_button, self.save_button, self.reset_button):
+            top.addWidget(button)
+        self.content.addLayout(top)
+
+        columns = QHBoxLayout()
+        step0 = QGroupBox("Step 0 · scale unification and metric")
+        form0 = QFormLayout(step0)
+        self.normalizer_box = QComboBox()
+        for normalizer_info in NORMALIZERS:
+            self.normalizer_box.addItem(normalizer_info.name, normalizer_info.name)
+            self.normalizer_box.setItemData(
+                self.normalizer_box.count() - 1,
+                normalizer_info.summary,
+                Qt.ItemDataRole.ToolTipRole,
+            )
+        self.normalizer_params = ParamsForm()
+        self.metric_box = QComboBox()
+        for info in METRICS:
+            domain = traits_of(info.obj).domain
+            label = info.name + ("" if domain == "any" else f"  ({domain} features)")
+            self.metric_box.addItem(label, info.name)
+            self.metric_box.setItemData(
+                self.metric_box.count() - 1, info.summary, Qt.ItemDataRole.ToolTipRole
+            )
+        self.metric_params = ParamsForm()
+        self.features = QComboBox()
+        for value, text in (
+            ("auto", "auto — the metric's domain"),
+            ("all", "all features (I ∪ J)"),
+            ("quantitative", "quantitative features (I)"),
+            ("nominal", "nominal features (J)"),
+        ):
+            self.features.addItem(text, value)
+        self.decimals = QSpinBox()
+        self.decimals.setRange(0, 15)
+        form0.addRow("Normalizer", self.normalizer_box)
+        form0.addRow(self.normalizer_params)
+        form0.addRow("Metric ρ", self.metric_box)
+        form0.addRow(self.metric_params)
+        form0.addRow("Features", self.features)
+        form0.addRow("Distance decimals", self.decimals)
+        columns.addWidget(step0, 1)
+
+        right = QGroupBox("Steps 1–6 · k, ε and the readings of §1.1")
+        form1 = QFormLayout(right)
+        self.k = QSpinBox()
+        self.k.setRange(1, 100_000)
+        self.permitted = QLabel()
+        self.k_rule = QComboBox()
+        for value in ("enforce", "warn", "off"):
+            self.k_rule.addItem(value, value)
+        self.epsilon = QDoubleSpinBox()
+        self.epsilon.setDecimals(6)
+        self.epsilon.setRange(0.000001, 1000.0)
+        self.d_decimals = QSpinBox()
+        self.d_decimals.setRange(0, 15)
+        form1.addRow("k of z(Sᵢ, k)", self.k)
+        form1.addRow("", self.permitted)
+        form1.addRow("k rule", self.k_rule)
+        form1.addRow("ε (blocking)", self.epsilon)
+        form1.addRow("d decimals", self.d_decimals)
+        self.readings: dict[str, QComboBox] = {}
+        for field, choices in READING_CHOICES.items():
+            box = QComboBox()
+            for text, value in choices:
+                box.addItem(text, value)
+            self.readings[field] = box
+        form1.addRow("Reading A", self.readings["self_in_l"])
+        form1.addRow("Reading B", self.readings["blocked_cover"])
+        form1.addRow("Reading C", self.readings["step5_return"])
+        form1.addRow("Scope of z", self.readings["z_scope"])
+        self.warning = QLabel()
+        self.warning.setWordWrap(True)
+        self.warning.setStyleSheet(
+            "background: #fff8e6; border-left: 3px solid #eda100; padding: 6px; color: #0b0b0b;"
+        )
+        form1.addRow(self.warning)
+        columns.addWidget(right, 1)
+        self.content.addLayout(columns)
+        self.content.addStretch(1)
+
+        for box in (
+            self.normalizer_box,
+            self.metric_box,
+            self.features,
+            self.k_rule,
+            *self.readings.values(),
+        ):
+            box.currentIndexChanged.connect(self._edited)
+        for spin in (self.decimals, self.k, self.d_decimals):
+            spin.valueChanged.connect(self._edited)
+        self.epsilon.valueChanged.connect(self._edited)
+        self.normalizer_params.changed.connect(self._edited)
+        self.metric_params.changed.connect(self._edited)
+        self.preset.activated.connect(self._preset_chosen)
+        self.load_button.clicked.connect(self._load)
+        self.save_button.clicked.connect(self._save)
+        self.reset_button.clicked.connect(lambda: self.show_config(ExperimentConfig()))
+        state.configChanged.connect(self._external)
+        state.datasetChanged.connect(self._dataset)
+        self.show_config(state.config)
+
+    # ------------------------------------------------------------------ state → widgets
+
+    def show_config(self, config: ExperimentConfig) -> None:
+        """Put ``config`` into the editors and the shared state."""
+        self._loading = True
+        try:
+            self._select(self.normalizer_box, config.preprocessing.normalizer.name)
+            self.normalizer_params.set_plugin(
+                NORMALIZERS,
+                config.preprocessing.normalizer.name,
+                dict(config.preprocessing.normalizer.params),
+            )
+            self._select(self.metric_box, METRICS.info(config.distance.metric.name).name)
+            self.metric_params.set_plugin(
+                METRICS, config.distance.metric.name, dict(config.distance.metric.params)
+            )
+            features = (
+                config.distance.features if isinstance(config.distance.features, str) else "auto"
+            )
+            self._select(self.features, features)
+            self.decimals.setValue(config.distance.decimals)
+            self.k.setValue(config.erdr.k)
+            self._select(self.k_rule, config.erdr.k_rule)
+            self.epsilon.setValue(config.erdr.epsilon)
+            self.d_decimals.setValue(config.erdr.d_decimals)
+            r = config.erdr.readings
+            for field, value in (
+                ("self_in_l", r.self_in_l),
+                ("blocked_cover", r.blocked_cover),
+                ("step5_return", r.step5_return),
+                ("z_scope", r.z_scope),
+            ):
+                self._select(self.readings[field], value)
+            self._base = config
+        finally:
+            self._loading = False
+        self.state.set_config(config)
+        self._refresh(config)
+
+    @staticmethod
+    def _select(box: QComboBox, value: object) -> None:
+        index = box.findData(value)
+        if index >= 0:
+            box.setCurrentIndex(index)
+
+    def _external(self, config: ExperimentConfig) -> None:
+        if config != self.current():
+            self.show_config(config)
+
+    def _dataset(self, dataset: Dataset | None) -> None:
+        self._refresh(self.state.config)
+
+    # ------------------------------------------------------------------ widgets → state
+
+    def current(self) -> ExperimentConfig:
+        """The configuration the editors describe."""
+        base = getattr(self, "_base", self.state.config)
+        normalizer = str(self.normalizer_box.currentData())
+        metric = str(self.metric_box.currentData())
+        readings = ReadingsConfig(
+            self_in_l=self.readings["self_in_l"].currentData(),
+            blocked_cover=self.readings["blocked_cover"].currentData(),
+            step5_return=self.readings["step5_return"].currentData(),
+            z_scope=self.readings["z_scope"].currentData(),
+        )
+        explicit = base.distance.features if not isinstance(base.distance.features, str) else None
+        chosen_features = self.features.currentData()
+        return base.model_copy(
+            update={
+                "preprocessing": PreprocessingConfig(
+                    normalizer=PluginSpec(name=normalizer, params=self.normalizer_params.values())
+                ),
+                "distance": DistanceConfig(
+                    metric=PluginSpec(name=metric, params=self.metric_params.values()),
+                    features=explicit
+                    if explicit and chosen_features == "auto"
+                    else chosen_features,
+                    decimals=self.decimals.value(),
+                ),
+                "erdr": ERDRConfig(
+                    k=self.k.value(),
+                    k_rule=self.k_rule.currentData(),
+                    epsilon=self.epsilon.value(),
+                    d_decimals=self.d_decimals.value(),
+                    readings=readings,
+                ),
+            }
+        )
+
+    def _edited(self) -> None:
+        if self._loading:
+            return
+        sender = self.sender()
+        if sender is self.normalizer_box:
+            self.normalizer_params.set_plugin(
+                NORMALIZERS, str(self.normalizer_box.currentData()), {}
+            )
+        if sender is self.metric_box:
+            self.metric_params.set_plugin(METRICS, str(self.metric_box.currentData()), {})
+        try:
+            config = self.current()
+        except (ERDRError, ValueError) as error:
+            self.report("Invalid setting", str(error))
+            return
+        self.state.set_config(config)
+        self._refresh(config)
+
+    def _refresh(self, config: ExperimentConfig) -> None:
+        chosen = matching_preset(config)
+        self._select(self.preset, chosen)
+        notes = reading_notes(config)
+        if notes:
+            self.warning.setText(
+                "⚠ Not the literal article reading: " + "; ".join(n.statement for n in notes)
+            )
+        else:
+            self.warning.setText("Literal article reading (the workbook's default).")
+        dataset = self.state.dataset
+        if dataset is None:
+            self.permitted.setText("k rule: odd k from 3 to 2·min|Kᵢ| − 3 (load a dataset)")
+        else:
+            sizes = [s for s in dataset.class_sizes if s > 0]
+            rule = permitted_k(sizes)
+            ok = "✓" if config.erdr.k in rule else "⚠ outside the rule"
+            self.permitted.setText(f"permitted for {dataset.name}: {rule.text}   {ok}")
+
+    def _preset_chosen(self, index: int) -> None:
+        name = self.preset.itemData(index)
+        if name is None:
+            return
+        current = self.current()
+        readings = preset(name).erdr.readings
+        self.show_config(
+            current.model_copy(
+                update={"erdr": current.erdr.model_copy(update={"readings": readings})}
+            )
+        )
+
+    def _load(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Open a configuration", "", CONFIG_FILTER)
+        if path:
+            self.open(Path(path))
+
+    def open(self, path: Path) -> bool:
+        """Load a configuration file."""
+        try:
+            config = load_config(path)
+        except ERDRError as error:
+            self.report("Cannot load the configuration", str(error))
+            return False
+        self.show_config(config)
+        return True
+
+    def _save(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save the configuration", "erdr.yaml", CONFIG_FILTER
+        )
+        if path:
+            try:
+                save_config(self.current(), Path(path), overwrite=True)
+            except ERDRError as error:
+                self.report("Cannot save the configuration", str(error))

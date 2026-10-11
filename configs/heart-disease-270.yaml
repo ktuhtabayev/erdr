@@ -1,0 +1,39 @@
+# erdr experiment configuration (Enemy-Radius Density Reduction)
+# preset: literal
+
+schema_version: 1
+name: erdr-heart-disease-270
+description: All 270 objects, literal reading of section 1.1 (|D| = 198 for k = 3).
+dataset:
+  path: heart-disease-270
+  format: auto
+  sheet: null
+  class_column: null
+  id_column: null
+  feature_types: null
+  missing_values: error
+preprocessing:
+  normalizer:
+    name: minmax
+    params: {}
+distance:
+  metric:
+    name: zhuravlev
+    params: {}
+  features: auto
+  decimals: 10
+erdr:
+  k: 3
+  k_rule: enforce
+  epsilon: 0.001
+  d_decimals: 10
+  readings:
+    self_in_l: included
+    blocked_cover: kept
+    step5_return: after-all
+    z_scope: all
+output:
+  runs_dir: runs
+  dataset_formats:
+  - dat
+  - csv

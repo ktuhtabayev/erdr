@@ -1,0 +1,1 @@
+Use “Enemy-Radius Density Reduction (ERDR)” as its full title in the documentation.
