@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QPersistentModelIndex, Qt
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, QPersistentModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 
 from erdr.export.tables import Table
@@ -49,9 +49,13 @@ Index = QModelIndex | QPersistentModelIndex
 class TableModel(QAbstractTableModel):
     """A read-only view of a :class:`~erdr.export.tables.Table`."""
 
-    def __init__(self, table: Table, decimals: int = 6) -> None:
-        """Show ``table`` with floats rounded to ``decimals`` (the tooltip shows every digit)."""
-        super().__init__()
+    def __init__(self, table: Table, decimals: int = 6, parent: QObject | None = None) -> None:
+        """Show ``table`` with floats rounded to ``decimals`` (the tooltip shows every digit).
+
+        Give the view as ``parent``: Qt then owns the model together with its view, so the
+        model cannot be freed while the view still shows it.
+        """
+        super().__init__(parent)
         self.table = table
         self.decimals = decimals
 

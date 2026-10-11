@@ -4,8 +4,10 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QSettings
 from pytestqt.qtbot import QtBot
 
+from erdr.gui.settings import Settings
 from erdr.gui.window import MainWindow
 from tests.conftest import ROOT
 
@@ -19,12 +21,22 @@ def messages() -> list[str]:
 
 
 @pytest.fixture
+def settings(tmp_path: Path) -> Settings:
+    """Settings in an ini file of the test's folder: the user's settings are never touched."""
+    return Settings(QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat))
+
+
+@pytest.fixture
 def window(
-    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, messages: list[str]
+    qtbot: QtBot,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    messages: list[str],
+    settings: Settings,
 ) -> Iterator[MainWindow]:
     """The main window; the dataset folder is the project's, runs and exports go to tmp_path."""
     monkeypatch.chdir(ROOT)
-    created = MainWindow()
+    created = MainWindow(settings=settings)
     created.show_message = lambda title, text: messages.append(f"{title}: {text}")  # type: ignore[method-assign]
     created.run_page.runs_dir = tmp_path / "runs"
     created.export_page.folder.setText(str(tmp_path / "exports"))

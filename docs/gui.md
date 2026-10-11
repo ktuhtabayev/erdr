@@ -3,8 +3,25 @@
 `erdr gui` (or `erdr-gui`, or the portable `erdr-gui.exe`) opens the default dataset. The pages
 follow the workflow — **Dataset → Configure → Run → Results → Readings & k → Export** — and the
 application computes nothing itself: a run, an analysis and an export are the services in a
-worker thread, and the tables and figures on screen are the exporters' own (ADR-012). The window
-follows the Windows light or dark theme.
+worker thread, and the tables and figures on screen are the exporters' own (ADR-012).
+
+## Appearance
+
+The application has the design of the template project's desktop application — the same
+colours, 10 pt base font, spacing, numbered page list, cards, buttons and tables (ADR-018).
+
+| | |
+|---|---|
+| **View → Light theme** (default) · **Dark theme** · **Follow Windows** | **Ctrl+T** switches between light and dark |
+| **View → Zoom in / Zoom out / Actual size** | **Ctrl++ / Ctrl+− / Ctrl+0** (85 % … 175 %) |
+| **Ctrl+1 … Ctrl+6** | the pages; **F5** runs ERDR; **Ctrl+C** copies selected table cells |
+
+The theme, the zoom and the window's size are remembered. `erdr gui --theme dark` (or
+`erdr-gui.exe --theme dark`) chooses the theme from the command line. The status bar shows the
+reading as a badge — `literal`, `closest` or `custom` — and a ⚠ badge whenever a switch differs
+from the literal article text; a click opens Configure.
+
+![The dark theme](images/gui/dark-results-iterations.png)
 
 ## Dataset
 
@@ -17,9 +34,11 @@ permitted k.
 ## Configure
 
 Step 0 (normalizer, metric — with a parameter form generated from the plug-in — feature selection,
-rounding) and Steps 1–6 (k with the k rule, ε, the readings A, B, C and the scope of z). The
-preset box shows `literal`, `closest` or `custom`; a non-literal reading is flagged. Load… and
-Save… read and write configuration files.
+rounding) and Steps 1–6 (k with the k rule, ε, the readings A, B, C and the scope of z). The title
+row shows which preset the settings match — `literal`, `closest` or `custom` — next to the
+*Literal preset*, *Closest preset* and *Reset* buttons; a ⚠ box at the top names every switch that
+differs from the literal article text. **File → Open configuration… / Save configuration as…**
+read and write configuration files.
 
 ![Configure](images/gui/configure.png)
 

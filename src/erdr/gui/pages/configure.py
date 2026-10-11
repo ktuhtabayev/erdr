@@ -38,7 +38,7 @@ from erdr.data.schema import Dataset
 from erdr.errors import ERDRError
 from erdr.gui.forms import ParamsForm
 from erdr.gui.state import AppState
-from erdr.gui.widgets import Page
+from erdr.gui.widgets import Page, WarningBox, badge, hint
 
 CONFIG_FILTER = "Configurations (*.yaml *.yml *.toml *.json);;All files (*)"
 READING_CHOICES: dict[str, list[tuple[str, Any]]] = {
@@ -81,20 +81,22 @@ class ConfigurePage(Page):
         self.report = report
         self._loading = False
 
-        top = QHBoxLayout()
-        self.preset = QComboBox()
-        for name in PresetName:
-            self.preset.addItem(name.value, name)
-        self.preset.addItem("custom", None)
-        self.load_button = QPushButton("Load…")
-        self.save_button = QPushButton("Save…")
+        # the title row, as in the template: which preset matches, and the presets
+        self.preset_badge = badge()
+        self.literal_button = QPushButton("Literal preset")
+        self.closest_button = QPushButton("Closest preset")
         self.reset_button = QPushButton("Reset")
-        top.addWidget(QLabel("Preset:"))
-        top.addWidget(self.preset)
-        top.addStretch(1)
-        for button in (self.load_button, self.save_button, self.reset_button):
-            top.addWidget(button)
-        self.content.addLayout(top)
+        self.literal_button.setToolTip("A = B = C = 1, z over any class — the article's text")
+        self.closest_button.setToolTip(
+            "B = 2 with the own-class z — closest to the article's Table 1"
+        )
+        self.reset_button.setToolTip("Every setting back to the default (the workbook's)")
+        self.header.addWidget(QLabel("Matches preset:"))
+        self.header.addWidget(self.preset_badge)
+        for button in (self.literal_button, self.closest_button, self.reset_button):
+            self.header.addWidget(button)
+        self.warning = WarningBox()
+        self.content.addWidget(self.warning)
 
         columns = QHBoxLayout()
         step0 = QGroupBox("Step 0 · scale unification and metric")
@@ -108,6 +110,7 @@ class ConfigurePage(Page):
                 Qt.ItemDataRole.ToolTipRole,
             )
         self.normalizer_params = ParamsForm()
+        self.normalizer_note = hint("", "note")
         self.metric_box = QComboBox()
         for info in METRICS:
             domain = traits_of(info.obj).domain
@@ -117,6 +120,7 @@ class ConfigurePage(Page):
                 self.metric_box.count() - 1, info.summary, Qt.ItemDataRole.ToolTipRole
             )
         self.metric_params = ParamsForm()
+        self.metric_note = hint("", "note")
         self.features = QComboBox()
         for value, text in (
             ("auto", "auto — the metric's domain"),
@@ -128,8 +132,10 @@ class ConfigurePage(Page):
         self.decimals = QSpinBox()
         self.decimals.setRange(0, 15)
         form0.addRow("Normalizer", self.normalizer_box)
+        form0.addRow("", self.normalizer_note)
         form0.addRow(self.normalizer_params)
         form0.addRow("Metric ρ", self.metric_box)
+        form0.addRow("", self.metric_note)
         form0.addRow(self.metric_params)
         form0.addRow("Features", self.features)
         form0.addRow("Distance decimals", self.decimals)
@@ -140,6 +146,7 @@ class ConfigurePage(Page):
         self.k = QSpinBox()
         self.k.setRange(1, 100_000)
         self.permitted = QLabel()
+        self.permitted.setObjectName("note")
         self.k_rule = QComboBox()
         for value in ("enforce", "warn", "off"):
             self.k_rule.addItem(value, value)
@@ -163,12 +170,6 @@ class ConfigurePage(Page):
         form1.addRow("Reading B", self.readings["blocked_cover"])
         form1.addRow("Reading C", self.readings["step5_return"])
         form1.addRow("Scope of z", self.readings["z_scope"])
-        self.warning = QLabel()
-        self.warning.setWordWrap(True)
-        self.warning.setStyleSheet(
-            "background: #fff8e6; border-left: 3px solid #eda100; padding: 6px; color: #0b0b0b;"
-        )
-        form1.addRow(self.warning)
         columns.addWidget(right, 1)
         self.content.addLayout(columns)
         self.content.addStretch(1)
@@ -186,9 +187,8 @@ class ConfigurePage(Page):
         self.epsilon.valueChanged.connect(self._edited)
         self.normalizer_params.changed.connect(self._edited)
         self.metric_params.changed.connect(self._edited)
-        self.preset.activated.connect(self._preset_chosen)
-        self.load_button.clicked.connect(self._load)
-        self.save_button.clicked.connect(self._save)
+        self.literal_button.clicked.connect(lambda: self.apply_preset(PresetName.LITERAL))
+        self.closest_button.clicked.connect(lambda: self.apply_preset(PresetName.CLOSEST))
         self.reset_button.clicked.connect(lambda: self.show_config(ExperimentConfig()))
         state.configChanged.connect(self._external)
         state.datasetChanged.connect(self._dataset)
@@ -303,14 +303,15 @@ class ConfigurePage(Page):
 
     def _refresh(self, config: ExperimentConfig) -> None:
         chosen = matching_preset(config)
-        self._select(self.preset, chosen)
+        self.preset_badge.setText(chosen.value if chosen else "custom")
+        self.normalizer_note.setText(NORMALIZERS.info(config.preprocessing.normalizer.name).summary)
+        self.metric_note.setText(METRICS.info(config.distance.metric.name).summary)
         notes = reading_notes(config)
-        if notes:
-            self.warning.setText(
-                "⚠ Not the literal article reading: " + "; ".join(n.statement for n in notes)
-            )
-        else:
-            self.warning.setText("Literal article reading (the workbook's default).")
+        self.warning.set_text(
+            "⚠ Not the literal article reading: " + "; ".join(n.statement for n in notes)
+            if notes
+            else ""
+        )
         dataset = self.state.dataset
         if dataset is None:
             self.permitted.setText("k rule: odd k from 3 to 2·min|Kᵢ| − 3 (load a dataset)")
@@ -320,10 +321,8 @@ class ConfigurePage(Page):
             ok = "✓" if config.erdr.k in rule else "⚠ outside the rule"
             self.permitted.setText(f"permitted for {dataset.name}: {rule.text}   {ok}")
 
-    def _preset_chosen(self, index: int) -> None:
-        name = self.preset.itemData(index)
-        if name is None:
-            return
+    def apply_preset(self, name: PresetName | str) -> None:
+        """Apply the readings of a preset (the other settings stay)."""
         current = self.current()
         readings = preset(name).erdr.readings
         self.show_config(

@@ -21,7 +21,7 @@ from erdr.core.readings import CLOSEST, LITERAL, Readings, ZScope
 from erdr.export.figures import readings_figure, sweep_figure
 from erdr.export.tables import readings_table, sweep_table
 from erdr.gui.state import AppState
-from erdr.gui.widgets import FigureView, Page, TableView
+from erdr.gui.widgets import FigureView, Page, TableView, section_title
 from erdr.gui.workers import TaskRunner
 from erdr.services.analysis import Progress, compare_readings, sweep_k
 
@@ -69,6 +69,7 @@ class AnalysisPage(Page):
         rl = QHBoxLayout(readings_box)
         self.both_z = QCheckBox("also with the own-class z")
         self.readings_button = QPushButton("Compare readings")
+        self.readings_button.setObjectName("primary")
         rl.addWidget(self.both_z)
         rl.addWidget(self.readings_button)
         controls.addWidget(readings_box)
@@ -83,6 +84,7 @@ class AnalysisPage(Page):
         self.use_closest.setChecked(True)
         self.use_current = QCheckBox("current configuration")
         self.sweep_button = QPushButton("Run the sweep")
+        self.sweep_button.setObjectName("primary")
         for widget in (
             QLabel("k:"),
             self.ks,
@@ -106,9 +108,9 @@ class AnalysisPage(Page):
         ll.setContentsMargins(0, 0, 0, 0)
         self.readings_view = TableView()
         self.sweep_view = TableView()
-        ll.addWidget(QLabel("Readings"))
+        ll.addWidget(section_title("Readings"))
         ll.addWidget(self.readings_view, 1)
-        ll.addWidget(QLabel("k sweep"))
+        ll.addWidget(section_title("k sweep"))
         ll.addWidget(self.sweep_view, 1)
         splitter.addWidget(left)
         self.figure_view = FigureView()

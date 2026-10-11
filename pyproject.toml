@@ -83,7 +83,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-erdr = ["py.typed", "data/datasets/*.csv"]
+erdr = ["py.typed", "data/datasets/*.csv", "gui/assets/*.svg"]
 
 # ---------------------------------------------------------------- tests
 [tool.pytest.ini_options]

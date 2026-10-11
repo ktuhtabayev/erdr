@@ -651,6 +651,9 @@ def export_run(
 def gui(
     source: DatasetArgument = None,
     config_path: ConfigOption = None,
+    theme: Annotated[
+        str | None, typer.Option("--theme", help="light (default), dark or system.")
+    ] = None,
 ) -> None:
     """Start the desktop application (needs PySide6: the optional extra "gui")."""
     try:
@@ -658,7 +661,7 @@ def gui(
     except ImportError as error:
         typer.echo(f"error: {GUI_EXTRA_HINT} ({error.name})", err=True)
         raise typer.Exit(EXIT_FAILED) from error
-    raise typer.Exit(launch(dataset=source, config=config_path))
+    raise typer.Exit(launch(dataset=source, config=config_path, theme=theme))
 
 
 def _utf8_console() -> None:
