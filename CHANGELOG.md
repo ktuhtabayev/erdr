@@ -5,6 +5,8 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-11 — Steps 1–5 as hyperspheres
+
 ### Added
 
 - Steps 1–5 as hyperspheres, from the ERDR workbook's new sheets *Hyperspheres (Step 1)*,
