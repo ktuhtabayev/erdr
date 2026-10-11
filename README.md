@@ -7,6 +7,10 @@ labelled sample E₀ into a **training sample D** and a **validation sample F = 
 workbook `ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` is the executable specification: the
 package reproduces every one of its computed sheets (937 checks).
 
+> **Windows app, no Python needed:** download `erdr-gui-<version>-windows.zip` from the
+> [latest release](https://github.com/ktuhtabayev/erdr/releases/latest), unpack it and start
+> `erdr-gui.exe`.
+
 ```text
 Step 0  x′ = (x − min)/(max − min),  ρ = Σ_I |x′ − y′| + Σ_J [x ≠ y]      (Zhuravlev metric)
 Step 1  r(Sᵢ) nearest enemy · g(Sᵢ) own class inside · z(Sᵢ, k) k-th neighbour · d = |z − r|/(z + r)
@@ -35,14 +39,16 @@ Step 5  |L| > 1 → g(Sⱼ) − 1 for Sⱼ ∈ L;  g(Sⱼ) = 1 → Sⱼ to D    
 | Configuration | typed (pydantic), YAML/TOML/JSON, presets `literal` and `closest`, hashing | ✓ |
 | Services | runner, repeatable run folders, readings comparison, k sweeps, workbook validation | ✓ |
 | Exports | CSV, JSON, Markdown, LaTeX, Excel (laid out like the workbook), PNG/SVG figures, HTML report, training/validation datasets | ✓ |
-| Interfaces | `erdr` CLI, desktop GUI (PySide6), portable Windows executable | ✓ |
-| Quality | 150 tests (golden: workbook, guide, Table 1; property-based), 94 % coverage, mypy strict, ruff, Windows CI | ✓ |
+| Interfaces | `erdr` CLI, desktop GUI (PySide6) in the template's design with light and dark themes, portable Windows executable | ✓ |
+| Quality | 157 tests (golden: workbook, guide, Table 1; property-based; GUI), 94 % coverage, mypy strict, ruff, Windows CI | ✓ |
 
 ## The desktop application without Python
 
-Download `erdr-gui-<version>-windows.zip` from the latest GitHub release (or build it with
+Download `erdr-gui-<version>-windows.zip` from the
+[latest release](https://github.com/ktuhtabayev/erdr/releases/latest) (or build it with
 `scripts\build_exe.py`), unpack it anywhere and start `erdr-gui.exe`. Nothing is installed; the
-Heart-Disease datasets are built in.
+Heart-Disease datasets are built in. The window is light by default; **View → Dark theme** (or
+**Ctrl+T**) and **Follow Windows** switch it, and **Ctrl++ / Ctrl+−** zoom.
 
 ![The results of the default experiment](docs/images/gui/results-iterations.png)
 

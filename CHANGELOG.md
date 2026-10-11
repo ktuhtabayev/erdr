@@ -5,6 +5,32 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Light and dark themes for the desktop application: **View → Light theme** (the default),
+  **Dark theme** and **Follow Windows**, **Ctrl+T** to switch; `erdr gui --theme` and
+  `erdr-gui --theme` choose one from the command line (ADR-018).
+- **View → Zoom in / Zoom out / Actual size** (Ctrl++, Ctrl+−, Ctrl+0; 85 % to 175 %), page
+  shortcuts Ctrl+1 … Ctrl+6, and **Ctrl+C** to copy selected table cells.
+- The theme, the zoom and the window's size are remembered between sessions.
+- The status bar shows the reading as a badge and a ⚠ badge when a switch differs from the
+  literal article text.
+- A direct link to the Windows app (the latest release) at the top of the README.
+
+### Changed
+
+- The desktop application has the design of the template project's — the same colours, 10 pt
+  base font, spacing, numbered page list, cards, buttons and tables. The Configure page shows the
+  matching preset with *Literal preset* and *Closest preset* buttons in its title row, the ⚠ box
+  on top and each plug-in's formula under its selector.
+- The documentation screenshots show the light theme (and one of the dark theme).
+
+### Fixed
+
+- The desktop application could crash when its appearance changed after several runs: a table's
+  model was owned by Python only and could be freed while its view was still alive. Models now
+  belong to their views, and the Results page deletes the tables of the previous run.
+
 ## [0.1.0] — 2026-10-11 — ERDR: library, CLI, desktop application, executable
 
 ### Added

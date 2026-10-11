@@ -10,10 +10,12 @@ import traceback
 from collections.abc import Sequence
 from pathlib import Path
 
-from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtCore import QCoreApplication, QSettings, Qt
 from PySide6.QtWidgets import QApplication
 
 from erdr import __version__
+from erdr.gui.settings import Settings
+from erdr.gui.theme import ThemeName, is_dark
 from erdr.gui.window import APP_TITLE, MainWindow
 
 SELF_TEST_SECONDS = 120.0
@@ -33,9 +35,24 @@ def create_application(argv: Sequence[str] | None = None) -> QApplication:
     return app
 
 
-def create_window(*, dataset: str | None = None, config: Path | None = None) -> MainWindow:
-    """The main window with what the command line named (the default dataset otherwise)."""
-    window = MainWindow()
+def create_window(
+    *,
+    dataset: str | None = None,
+    config: Path | None = None,
+    theme: str | None = None,
+    settings: Settings | None = None,
+) -> MainWindow:
+    """The main window with what the command line named (the default dataset otherwise).
+
+    Args:
+        dataset: A dataset file, id or name to open.
+        config: A configuration file to open.
+        theme: ``light``, ``dark`` or ``system`` for this session (and remembered).
+        settings: Where the window keeps its settings (default: the user's).
+    """
+    window = MainWindow(settings=settings)
+    if theme is not None:
+        window.set_theme(theme)
     if config is not None:
         window.open_config(config)
     if dataset is not None:
@@ -45,10 +62,12 @@ def create_window(*, dataset: str | None = None, config: Path | None = None) -> 
     return window
 
 
-def launch(*, dataset: str | None = None, config: Path | None = None) -> int:
+def launch(
+    *, dataset: str | None = None, config: Path | None = None, theme: str | None = None
+) -> int:
     """Run the application until its window is closed; returns the exit code."""
     app = create_application()
-    window = create_window(dataset=dataset, config=config)
+    window = create_window(dataset=dataset, config=config, theme=theme)
     window.show()
     return int(app.exec())
 
@@ -77,15 +96,23 @@ def self_test(report: Path | None = None) -> int:
         passed = passed and ok
         lines.append(f"{'ok  ' if ok else 'FAIL'}  {what}")
 
+    scratch_settings = tempfile.TemporaryDirectory()
     try:
-        create_application()
+        app = create_application()
         problems: list[str] = []
-        window = create_window()
+        store = QSettings(
+            str(Path(scratch_settings.name) / "settings.ini"), QSettings.Format.IniFormat
+        )
+        window = create_window(settings=Settings(store))  # the user's settings stay untouched
         window.show_message = lambda title, text: problems.append(f"{title}: {text}")  # type: ignore[method-assign]
         window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
         window.show()
         dataset = window.state.dataset
         check(f"default dataset: {dataset.name if dataset else 'none'}", dataset is not None)
+        check("light theme (the default)", not is_dark(app.palette()))
+        window.set_theme(ThemeName.DARK)
+        check("dark theme", is_dark(app.palette()))
+        window.set_theme(ThemeName.LIGHT)
         ended: list[bool] = []
         window.run_page.finished.connect(lambda ok: ended.append(ok))
         window.run_page.start()
@@ -132,6 +159,8 @@ def self_test(report: Path | None = None) -> int:
     except Exception:  # the report must say what broke
         passed = False
         lines.append("FAIL  " + traceback.format_exc())
+    finally:
+        scratch_settings.cleanup()
     lines.append("PASSED" if passed else "FAILED")
     text = "\n".join(lines) + "\n"
     if report is not None:
@@ -147,6 +176,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("dataset", nargs="?", help="dataset file, id or name to open")
     parser.add_argument("--config", "-c", type=Path, help="configuration file to open")
     parser.add_argument(
+        "--theme",
+        choices=[name.value for name in ThemeName],
+        help="light (default), dark, or system — the Windows light or dark mode",
+    )
+    parser.add_argument(
         "--self-test",
         nargs="?",
         const="-",
@@ -157,7 +191,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     if arguments.self_test is not None:
         target = None if arguments.self_test == "-" else Path(arguments.self_test)
         raise SystemExit(self_test(target))
-    raise SystemExit(launch(dataset=arguments.dataset, config=arguments.config))
+    raise SystemExit(
+        launch(dataset=arguments.dataset, config=arguments.config, theme=arguments.theme)
+    )
 
 
 if __name__ == "__main__":

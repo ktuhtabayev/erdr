@@ -66,6 +66,11 @@ class ResultsPage(Page):
     def _show(self, result: ExperimentResult | None) -> None:
         self.tabs.clear()
         self.views.clear()
+        while self.tabs.count():  # the tabs of the previous run are deleted, not only hidden
+            page = self.tabs.widget(0)
+            self.tabs.removeTab(0)
+            if page is not None:
+                page.deleteLater()
         self.empty.setVisible(result is None)
         self.legend.setVisible(result is not None)
         self.tabs.setVisible(result is not None)

@@ -76,7 +76,7 @@ class ExportPage(Page):
         self.content.addLayout(row)
         buttons = QHBoxLayout()
         self.export_button = QPushButton("Export")
-        self.export_button.setMinimumHeight(32)
+        self.export_button.setObjectName("primary")
         self.open_button = QPushButton("Open the folder")
         buttons.addWidget(self.export_button)
         buttons.addWidget(self.open_button)

@@ -189,3 +189,26 @@ closest reading found (B = 2 with the own-class z) differs by 0–16. |L| = 0 is
 g(Sⱼ) > 1 in L only ever excludes Sᵢ itself. g is written as a set but used as its size. The
 article counts 7 quantitative features where the data file flags 6 (probably x₁₁). These are
 reported, not "fixed": the defaults follow the text and the file.
+
+## ADR-018 — The desktop application shares the template's design; light by default (author)
+
+*Accepted, 2026-10-11.*
+
+**Author.** Make the ERDR application look like the template project's — the same style, font
+sizes and spacing — and give it a light ("white") mode, not only the Windows dark window.
+
+- `erdr.gui.theme` takes over the template's design tokens and style sheet unchanged in look:
+  colours, a 10 pt base font (Qt's Windows default is 9 pt), page margins 18/14/18/12 px with 8 px
+  spacing, the numbered page list of at least 184 px, cards, buttons (the main action of a page in
+  the accent colour), inputs, tables with alternating rows, tabs and the status-bar badges.
+- Themes: **light** (default), **dark**, and **system**, which shows the light or the dark palette
+  as Windows is set — the styling is the same in every case. On Qt ≥ 6.8 the window frame follows
+  the theme. The tinted table cells keep their light tints and dark ink in every theme, so they
+  look as in Excel and in the HTML report.
+- View → Zoom with the template's steps (0.85 … 1.75); the theme, the zoom and the window geometry
+  are stored in the user's settings (`erdr/erdr`); tests and the self-test use their own ini file.
+- A table model is created with its view as parent: owned by Python only, it could be freed while
+  its view still existed, and restyling the application then crashed. The Results page deletes
+  the tables of a previous run instead of only hiding them.
+
+No numerical result changes.

@@ -2,7 +2,8 @@ r"""Take the screenshots of ``docs/gui.md`` (every page of the desktop applicati
 
 Run from the repository root::
 
-    .\.venv\Scripts\python.exe scripts\gui_screenshots.py
+    .\.venv\Scripts\python.exe scripts\gui_screenshots.py         # light theme (default)
+    .\.venv\Scripts\python.exe scripts\gui_screenshots.py dark    # the dark theme
 
 The window is laid out by the platform but never shown on screen; each page is grabbed after the
 default dataset has been run, the readings compared and a k sweep made.
@@ -24,12 +25,18 @@ def main() -> int:
     os.chdir(ROOT)
     # the native platform draws with the system fonts (Qt's offscreen platform has none)
     os.environ["QT_QPA_PLATFORM"] = "windows"
-    from PySide6.QtCore import QCoreApplication, Qt
+    import tempfile
+
+    from PySide6.QtCore import QCoreApplication, QSettings, Qt
 
     from erdr.gui.app import create_application, create_window
+    from erdr.gui.settings import Settings
 
     create_application()
-    window = create_window()
+    scratch = tempfile.TemporaryDirectory()  # the user's settings are never read or changed
+    store = QSettings(str(Path(scratch.name) / "settings.ini"), QSettings.Format.IniFormat)
+    theme = sys.argv[1] if len(sys.argv) > 1 else "light"
+    window = create_window(theme=theme, settings=Settings(store))
     window.show_message = lambda title, text: print(f"{title}: {text}", file=sys.stderr)  # type: ignore[method-assign]
     window.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
     window.resize(1360, 860)
@@ -71,8 +78,9 @@ def main() -> int:
         if tab is not None:
             window.results_page.show_tab(tab)
         settle()
-        window.grab().save(str(OUT / f"{name}.png"))
-        print(OUT / f"{name}.png")
+        target = OUT / (f"{name}.png" if theme == "light" else f"{theme}-{name}.png")
+        window.grab().save(str(target))
+        print(target)
     window.close()
     return 0
 
