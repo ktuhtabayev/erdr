@@ -5,6 +5,8 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-11 — the explorer's owner
+
 ### Fixed
 
 - The GUI tests could end with exit code 1 (or 127) after all of them had passed: the hypersphere
