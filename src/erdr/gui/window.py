@@ -35,7 +35,7 @@ from erdr.gui.pages.run import RunPage
 from erdr.gui.settings import Settings
 from erdr.gui.state import AppState
 from erdr.gui.theme import FONT_SCALES, ThemeName, apply_theme, theme_name
-from erdr.gui.widgets import Page
+from erdr.gui.widgets import Page, chip
 from erdr.services.experiment import ExperimentResult
 from erdr.services.runs import load_run
 
@@ -141,7 +141,9 @@ class MainWindow(QMainWindow):
         result = self.state.result
         self.dataset_label.setText(dataset.name if dataset else "no dataset")
         self.result_label.setText(
-            f"D = {result.result.training.size}, F = {result.result.validation.size}"
+            chip(f"D = {result.result.training.size}", "D")
+            + ", "
+            + chip(f"F = {result.result.validation.size}", "F")
             if result is not None
             else ""
         )

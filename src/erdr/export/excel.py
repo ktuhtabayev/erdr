@@ -2,7 +2,10 @@
 
 Tables that mirror the same sheet of the ERDR workbook are stacked on one sheet, in workbook
 order (*Overview*, *Dataset*, *Normalized Dataset*, *Zhuravlev Distances*, …); the figures go to
-*Charts*. Values are written exactly (no rounding); the marks of the cells become fills.
+*Charts*. Values are written exactly (no rounding). The styles are the workbook's: dark-blue
+sheet title, blue table title bars, grey-blue column headers, sheet tabs coloured by stage; the
+marks of the cells and headers become the colours of :mod:`erdr.export.theme`, explained by the
+colour legend on the *Overview* sheet (ADR-019).
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 from openpyxl import Workbook
+from openpyxl.cell.cell import Cell as XlCell
 from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -20,40 +24,32 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from erdr import __version__
 from erdr.export.tables import Table
+from erdr.export.theme import legend, meaning, stage_of, swatch
 
-TITLE_FILL = PatternFill("solid", fgColor="0D366B")
-HEADER_FILL = PatternFill("solid", fgColor="E1E0D9")
-MARK_FILLS = {
-    "D": "CDE2FB",
-    "F": "FBE0D3",
-    "selected": "FFF0C2",
-    "L": "D1F0E4",
-    "moved": "B7D3F6",
-    "decreased": "E0DCF7",
-    "own": "EEF5FD",
-    "enemy": "FBDADA",
-    "tie-r": "FFF0C2",
-    "tie-index": "DCEBFB",
-    "literal": "FFF0C2",
-    "yes": "D1F0E4",
-    "no": "F0EFEC",
-}
-"""Cell fill per mark (light tints; the legend is on the *Overview* sheet)."""
-MARK_LEGEND = {
-    "D": "training sample D",
-    "F": "validation sample F",
-    "selected": "selected object Sᵢ / tie decided by r",
-    "L": "member of L",
-    "moved": "moved to D",
-    "decreased": "counter decreased by Step 5",
-    "own": "own class inside the enemy sphere / same class",
-    "enemy": "enemy (other class)",
-    "tie-index": "tie decided by the index",
-    "literal": "the literal article reading",
-    "yes": "case occurs",
-    "no": "case does not occur",
-}
+SHEET_TITLE = "1F3864"
+"""The workbook's dark blue: the title bar of the *Overview* sheet."""
+TABLE_TITLE = "2F5597"
+"""The workbook's blue: the title bar of every table."""
+HEADER = "D6DCE4"
+"""The workbook's grey-blue column header (a column without a mark)."""
+NOTE_INK = "595959"
 _WIDTH_LIMIT = 60
+
+
+def _rgb(colour: str) -> str:
+    """``#ddebf7`` → ``DDEBF7`` (openpyxl's form)."""
+    return colour.lstrip("#").upper()
+
+
+def _paint(cell: XlCell, mark: str | None, *, bold: bool = False) -> None:
+    """Give ``cell`` the fill and ink of ``mark`` (nothing for no mark)."""
+    found = swatch(mark)
+    if found is None:
+        if bold:
+            cell.font = Font(bold=True)
+        return
+    cell.fill = PatternFill("solid", fgColor=_rgb(found.fill))
+    cell.font = Font(bold=bold, color=_rgb(found.ink))
 
 
 def _sheet_name(name: str, taken: set[str]) -> str:
@@ -73,22 +69,21 @@ def _write_table(ws: Worksheet, table: Table, top: int) -> int:
     title = ws.cell(row=top, column=1, value=table.title)
     title.font = Font(bold=True, color="FFFFFF")
     for column in range(1, width + 1):
-        ws.cell(row=top, column=column).fill = TITLE_FILL
+        ws.cell(row=top, column=column).fill = PatternFill("solid", fgColor=TABLE_TITLE)
     for column, name in enumerate(table.columns, start=1):
         cell = ws.cell(row=top + 1, column=column, value=name)
-        cell.font = Font(bold=True)
-        cell.fill = HEADER_FILL
+        mark = table.header_mark(column - 1)
+        if swatch(mark) is None:
+            cell.fill = PatternFill("solid", fgColor=HEADER)
+        _paint(cell, mark, bold=True)
         cell.alignment = Alignment(wrap_text=True, vertical="top")
     for r, row in enumerate(table.rows):
         for c, value in enumerate(row):
             cell = ws.cell(row=top + 2 + r, column=c + 1, value=value)
-            mark = table.mark(r, c)
-            if mark in MARK_FILLS:
-                cell.fill = PatternFill("solid", fgColor=MARK_FILLS[mark])
-        ws.cell(row=top + 2 + r, column=1).font = Font(bold=True)
+            _paint(cell, table.mark(r, c), bold=c == 0)
     end = top + 2 + len(table.rows)
     if table.note:
-        ws.cell(row=end, column=1, value=table.note).font = Font(italic=True, color="52514E")
+        ws.cell(row=end, column=1, value=table.note).font = Font(italic=True, color=NOTE_INK)
         end += 1
     return end + 1
 
@@ -105,6 +100,29 @@ def _fit_columns(ws: Worksheet) -> None:
         ws.column_dimensions[get_column_letter(column)].width = max(8, width + 2)
 
 
+def _tab(ws: Worksheet, sheet: str) -> None:
+    """Colour the sheet tab by the stage of the experiment (the workbook's tab colours)."""
+    stage = stage_of(sheet)
+    if stage is not None:
+        ws.sheet_properties.tabColor = _rgb(stage.colour)
+
+
+def _legend(
+    ws: Worksheet, row: int, tables: Sequence[Table], class_labels: Sequence[object]
+) -> int:
+    """The colour legend of the marks the workbook uses; returns the next free row."""
+    title = ws.cell(row=row, column=1, value="Colour legend")
+    title.font = Font(bold=True, color=SHEET_TITLE)
+    used: set[str] = set().union(*(table.used_marks() for table in tables))
+    for section, marks in legend(used):
+        row += 1
+        ws.cell(row=row, column=1, value=section).font = Font(italic=True, color=NOTE_INK)
+        for mark in marks:
+            row += 1
+            _paint(ws.cell(row=row, column=1, value=meaning(mark, class_labels)), mark, bold=True)
+    return row + 1
+
+
 def write_workbook(
     path: Path,
     tables: Sequence[Table],
@@ -112,6 +130,7 @@ def write_workbook(
     title: str,
     settings: Sequence[tuple[str, str]] = (),
     figures: Sequence[tuple[str, Figure]] = (),
+    class_labels: Sequence[object] = (),
 ) -> Path:
     """Write the tables (stacked per workbook sheet), the settings and the figures.
 
@@ -119,21 +138,30 @@ def write_workbook(
         path: The ``.xlsx`` file.
         tables: The tables; those with the same :attr:`Table.sheet` share a sheet.
         title: The title on the *Overview* sheet.
-        settings: (name, value) pairs shown on the *Overview* sheet.
+        settings: (name, value) pairs shown on the *Overview* sheet; a pair named ``Note`` is a
+            reading that is not the literal one and is shown as a warning.
         figures: (name, figure) pairs placed on the *Charts* sheet.
+        class_labels: The labels of the classes K1, K2, … (named in the colour legend).
     """
     workbook = Workbook()
     overview = workbook.active
     assert overview is not None  # a new workbook always has its first sheet
     overview.title = "Overview"
-    overview.cell(row=1, column=1, value=title).font = Font(bold=True, size=14)
+    _tab(overview, "Overview")
+    heading = overview.cell(row=1, column=1, value=title)
+    heading.font = Font(bold=True, size=14, color="FFFFFF")
+    for column in (1, 2):
+        overview.cell(row=1, column=column).fill = PatternFill("solid", fgColor=SHEET_TITLE)
     overview.cell(row=2, column=1, value=f"Written by erdr {__version__}").font = Font(
-        italic=True, color="52514E"
+        italic=True, color=NOTE_INK
     )
     row = 4
     for name, value in settings:
-        overview.cell(row=row, column=1, value=name).font = Font(bold=True)
-        overview.cell(row=row, column=2, value=value)
+        mark = "warning" if name == "Note" else "parameter"
+        _paint(overview.cell(row=row, column=1, value=name), mark, bold=True)
+        value_cell = overview.cell(row=row, column=2, value=value)
+        if mark == "warning":
+            _paint(value_cell, mark)
         row += 1
     row += 1
     taken = {"Overview"}
@@ -142,15 +170,12 @@ def write_workbook(
         sheets.setdefault(table.sheet or table.key, []).append(table)
     for table in sheets.pop("Overview", []):
         row = _write_table(overview, table, row)
-    overview.cell(row=row, column=1, value="Colour legend").font = Font(bold=True)
-    for mark, meaning in MARK_LEGEND.items():
-        row += 1
-        cell = overview.cell(row=row, column=1, value=meaning)
-        cell.fill = PatternFill("solid", fgColor=MARK_FILLS[mark])
+    _legend(overview, row, tables, class_labels)
     _fit_columns(overview)
 
     for name, group in sheets.items():
         ws = workbook.create_sheet(_sheet_name(name, taken))
+        _tab(ws, name)
         top = 1
         for table in group:
             top = _write_table(ws, table, top)
@@ -160,6 +185,7 @@ def write_workbook(
 
     if figures:
         charts = workbook.create_sheet(_sheet_name("Charts", taken))
+        _tab(charts, "Charts")
         top = 1
         for name, figure in figures:
             charts.cell(row=top, column=1, value=name).font = Font(bold=True)

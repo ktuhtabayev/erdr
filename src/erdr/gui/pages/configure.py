@@ -1,4 +1,8 @@
-"""Configure page: Step 0 (normalizer, metric), Steps 1–6 (k, ε) and the readings A, B, C, z."""
+"""Configure page: Step 0 (normalizer, metric), Steps 1–6 (k, ε) and the readings A, B, C, z.
+
+A switch set to something other than the literal article text is shown in the warning colours,
+and so is the preset badge whenever the reading is not the literal one (ADR-003, ADR-019).
+"""
 
 from __future__ import annotations
 
@@ -301,12 +305,29 @@ class ConfigurePage(Page):
         self.state.set_config(config)
         self._refresh(config)
 
+    @staticmethod
+    def _flag(widget: QWidget, name: str, value: object) -> None:
+        """Set a style-sheet property and restyle the widget."""
+        if widget.property(name) != value:
+            widget.setProperty(name, value)
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+
     def _refresh(self, config: ExperimentConfig) -> None:
         chosen = matching_preset(config)
         self.preset_badge.setText(chosen.value if chosen else "custom")
         self.normalizer_note.setText(NORMALIZERS.info(config.preprocessing.normalizer.name).summary)
         self.metric_note.setText(METRICS.info(config.distance.metric.name).summary)
         notes = reading_notes(config)
+        for field, box in self.readings.items():
+            literal = READING_CHOICES[field][0][1]  # the first choice is the article's text
+            flagged = box.currentData() != literal
+            self._flag(box, "flagged", flagged)
+            box.setToolTip(
+                "⚠ Not the literal article reading" if flagged else "The literal article reading"
+            )
+        self.preset_badge.setObjectName("warningBadge" if notes else "badge")
+        self._flag(self.preset_badge, "literal", not notes)
         self.warning.set_text(
             "⚠ Not the literal article reading: " + "; ".join(n.statement for n in notes)
             if notes

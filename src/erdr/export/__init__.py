@@ -164,6 +164,7 @@ def export_xlsx(run: ExperimentResult, folder: Path, options: ExportOptions) -> 
         title=_title(run),
         settings=run_settings(run) + [("Note", note) for note in run.notes],
         figures=figures,
+        class_labels=run.dataset.classes,
     )
     return [path]
 
@@ -192,6 +193,7 @@ def export_html(run: ExperimentResult, folder: Path, options: ExportOptions) -> 
         figures=[(name, figure) for _, name, figure in all_figures(run, options)],
         m=run.result.m,
         footer=f"configuration {run.config_hash[:12]} · dataset {run.dataset_hash[:12]}",
+        class_labels=run.dataset.classes,
     )
     return [text.write_text(folder / "report.html", document)]
 

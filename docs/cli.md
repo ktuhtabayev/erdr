@@ -3,6 +3,10 @@
 `erdr` (or `python -m erdr`). Global options: `--version`, `-v`/`-vv` (more log output). Errors
 are reported in one line with exit code 2; failed validations exit with 1.
 
+On a terminal the output uses the project's colours (ADR-019): column headers by what they hold,
+the classes K1, K2 and the samples D, F in their colours, ⚠ lines orange, ✓ green and ✗ red.
+Redirected output has no colour codes, and `NO_COLOR=1` turns colour off.
+
 | Command | What it does |
 |---|---|
 | `erdr run [DATASET] [-c FILE]` | runs ERDR; prints Step 1, every iteration, D, F, the routes and the cases (`--brief` for the result only, `--all` for every row) |

@@ -1,4 +1,8 @@
-"""Run page: run ERDR in the background, watch the log, optionally save a run folder."""
+"""Run page: run ERDR in the background, watch the log, optionally save a run folder.
+
+The settings of the run are shown as parameter chips, the reading in the warning colours when it
+is not the literal one, and the outcome in the colours of the samples D and F (ADR-019).
+"""
 
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ from PySide6.QtWidgets import (
 from erdr.config.models import ExperimentConfig
 from erdr.data.schema import Dataset
 from erdr.gui.state import AppState
-from erdr.gui.widgets import LogBridge, Page
+from erdr.gui.widgets import LogBridge, Page, chip
 from erdr.gui.workers import TaskRunner
 from erdr.notation import object_set
 from erdr.services.experiment import ExperimentResult, run_experiment
@@ -94,10 +98,17 @@ class RunPage(Page):
         config = self.state.config
         reading = config.erdr.readings.to_readings()
         name = dataset.name if dataset else "no dataset loaded"
-        self.context.setText(
-            f"<b>{name}</b> · k = {config.erdr.k} · {reading.label} · "
-            f"{config.preprocessing.normalizer.name} · {config.distance.metric.name}"
+        parameters = " ".join(
+            chip(text, "parameter")
+            for text in (
+                f"k = {config.erdr.k}",
+                config.preprocessing.normalizer.name,
+                config.distance.metric.name,
+                f"ε = {config.erdr.epsilon:g}",
+            )
         )
+        flag = "literal" if reading.is_literal else "warning"
+        self.context.setText(f"<b>{name}</b> &nbsp; {parameters} {chip(reading.label, flag)}")
         self.start_button.setEnabled(dataset is not None and not self.tasks.busy())
 
     def is_running(self) -> bool:
@@ -143,11 +154,15 @@ class RunPage(Page):
         small = result.dataset.m <= 60
         d_set = object_set(result.result.training, names) if small else ""
         f_set = object_set(result.result.validation, names) if small else ""
-        notes = "".join(f"<br>⚠ {note}" for note in (*result.notes, *result.warnings))
+        notes = "".join(
+            f"<br>{chip(f'⚠ {note}', 'warning', bold=False)}"
+            for note in (*result.notes, *result.warnings)
+        )
         saved = f"<br>Saved: {self.state.saved_run}" if self.state.saved_run else ""
+        training = chip(f"D (training): {result.result.training.size}", "D")
+        validation = chip(f"F (validation): {result.result.validation.size}", "F")
         self.outcome.setText(
-            f"<b>D (training): {result.result.training.size}</b> {d_set} · "
-            f"<b>F (validation): {result.result.validation.size}</b> {f_set} · "
+            f"{training} {d_set} · {validation} {f_set} · "
             f"{len(result.result.iterations)} iterations · "
             f"{sum(c.occurs for c in result.cases)} of {len(result.cases)} cases · "
             f"{result.seconds:.3f} s{notes}{saved}"

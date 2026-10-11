@@ -1,15 +1,30 @@
-"""Reusable widgets in the template's style: page frame, titles, warning box, tables, figures."""
+"""Reusable widgets in the template's style: page frame, titles, warning box, tables, figures.
+
+Tables paint every column header in the colour of what the column holds and every marked cell in
+the colour of what it means; :class:`Legend` explains the colours a table uses and :func:`chip`
+shows a count or a name in its category's colours (ADR-019).
+"""
 
 from __future__ import annotations
 
+import html
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 
 from matplotlib.backends.backend_qt import NavigationToolbar2QT
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtCore import QObject, QRect, Qt, Signal
+from PySide6.QtGui import (
+    QColor,
+    QGuiApplication,
+    QIcon,
+    QKeySequence,
+    QPainter,
+    QPalette,
+    QPixmap,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -23,8 +38,26 @@ from PySide6.QtWidgets import (
 )
 
 from erdr.export.tables import Table
+from erdr.export.theme import SWATCHES, legend, meaning
 from erdr.gui.models import TableModel
 from erdr.log import KeyValueFormatter
+
+
+def chip(text: str, mark: str, *, bold: bool = True) -> str:
+    """Rich text: ``text`` in the tint and the ink of ``mark`` (a count, a name, a legend entry)."""
+    found = SWATCHES[mark]
+    weight = " font-weight:600;" if bold else ""
+    return (
+        f"<span style='background-color:{found.fill}; color:{found.ink};{weight}'>"
+        f"&nbsp;{html.escape(text)}&nbsp;</span>"
+    )
+
+
+def swatch_icon(colour: str, size: int = 10) -> QIcon:
+    """A small square of ``colour`` (the stage of a tab)."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(QColor(colour))
+    return QIcon(pixmap)
 
 
 def page_title(text: str) -> QLabel:
@@ -82,12 +115,75 @@ class WarningBox(QFrame):
         return self.label.text()
 
 
+class Legend(QLabel):
+    """What the colours of a table mean: one chip per mark it uses, by section (ADR-019)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        """An empty legend (hidden until it has marks)."""
+        super().__init__(parent)
+        self.setObjectName("legend")
+        self.setWordWrap(True)
+        self.setTextFormat(Qt.TextFormat.RichText)
+        self.marks: list[str] = []
+        """The marks shown, in legend order."""
+        self.setVisible(False)
+
+    def show_marks(self, marks: Iterable[str | None], class_labels: Sequence[object] = ()) -> None:
+        """Explain ``marks``; ``class_labels`` name the classes K1, K2 and so on."""
+        sections = legend(marks)
+        self.marks = [mark for _, members in sections for mark in members]
+        self.setText(
+            " &nbsp; ".join(
+                f"{html.escape(title)}: "
+                + " ".join(chip(meaning(mark, class_labels), mark) for mark in members)
+                for title, members in sections
+            )
+        )
+        self.setVisible(bool(sections))
+
+    def show_table(self, table: Table | None, class_labels: Sequence[object] = ()) -> None:
+        """Explain the colours of ``table`` (nothing for ``None``)."""
+        self.show_marks(table.used_marks() if table is not None else (), class_labels)
+
+
+class RoleHeader(QHeaderView):
+    """A table header that paints a column in the colour of what it holds (the template's)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        """A horizontal header; unmarked columns keep the style sheet's look."""
+        super().__init__(Qt.Orientation.Horizontal, parent)
+
+    def paintSection(self, painter: QPainter, rect: QRect, logicalIndex: int) -> None:
+        """Fill a marked column's header with its tint and write its name in its ink."""
+        model = self.model()
+        found = model.header_swatch(logicalIndex) if isinstance(model, TableModel) else None
+        if found is None or not rect.isValid():
+            super().paintSection(painter, rect, logicalIndex)
+            return
+        painter.save()
+        painter.fillRect(rect, QColor(found.fill))
+        painter.setPen(self.palette().color(QPalette.ColorRole.Mid))
+        painter.drawLine(rect.topRight(), rect.bottomRight())
+        painter.drawLine(rect.bottomLeft(), rect.bottomRight())
+        font = painter.font()
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor(found.ink))
+        text = str(model.headerData(logicalIndex, Qt.Orientation.Horizontal) or "")
+        area = rect.adjusted(8, 0, -8, 0)
+        text = painter.fontMetrics().elidedText(text, Qt.TextElideMode.ElideRight, area.width())
+        left = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        painter.drawText(area, int(left), text)
+        painter.restore()
+
+
 class TableView(QTableView):
     """A read-only table of an exporter's :class:`~erdr.export.tables.Table`."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """An empty view: alternating rows, row selection, Ctrl+C copies (the template's)."""
         super().__init__(parent)
+        self.setHorizontalHeader(RoleHeader(self))
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -96,15 +192,23 @@ class TableView(QTableView):
         self.setWordWrap(False)
         self.setSortingEnabled(False)  # tables open in the workbook's order
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.horizontalHeader().setDefaultAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setDefaultSectionSize(24)
         QShortcut(QKeySequence.StandardKey.Copy, self, self.copy_selection)
 
-    def show_table(self, table: Table, decimals: int = 6) -> None:
-        """Show ``table``; columns are sized to their content (up to a limit)."""
+    def show_table(
+        self, table: Table, decimals: int = 6, class_labels: Sequence[object] = ()
+    ) -> None:
+        """Show ``table``; columns are sized to their content (up to a limit).
+
+        ``class_labels`` name the classes K1, K2, … in the tooltips.
+        """
         previous = self.model()
-        self.setModel(TableModel(table, decimals, self))  # owned by the view (Qt), not by Python
+        model = TableModel(table, decimals, self, class_labels)  # owned by the view (Qt)
+        self.setModel(model)
         if previous is not None:
             previous.deleteLater()
         self.resizeColumnsToContents()
