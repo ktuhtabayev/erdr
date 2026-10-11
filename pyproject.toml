@@ -1,6 +1,6 @@
 [project]
 name = "erdr"
-version = "0.2.0"
+version = "0.3.0"
 description = "Enemy-Radius Density Reduction (ERDR): training / validation split by enemy radii and local density — library, CLI and desktop GUI."
 readme = "README.md"
 requires-python = ">=3.11"
