@@ -132,7 +132,7 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
           $notes = (Get-Content CHANGELOG.md -Raw) -split "(?m)^## " |
-            Where-Object { $_ -like "[$version]*" } | Select-Object -First 1
+            Where-Object { $_.StartsWith("[$version]") } | Select-Object -First 1
           if (-not $notes) { $notes = "Release $tag" } else { $notes = "## " + $notes }
           Set-Content -Path release-notes.md -Value $notes -Encoding utf8
           gh release create $tag (Get-ChildItem dist/erdr-gui-*-windows.zip) `
