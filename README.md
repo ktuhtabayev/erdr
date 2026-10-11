@@ -5,7 +5,9 @@ N. A. Ignatev's article *«Ансамбли алгоритмов распозн�
 контекстов k ближайших соседей»* — library, `erdr` command line and desktop GUI. ERDR divides a
 labelled sample E₀ into a **training sample D** and a **validation sample F = E₀ \ D**. The Excel
 workbook `ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` is the executable specification: the
-package reproduces every one of its computed sheets (937 checks).
+package reproduces every one of its computed sheets (2,927 checks), and shows Steps 1–5 as
+hyperspheres — every object's enemy sphere and k-sphere, and in every iteration the spheres that
+contain the selected object and form L.
 
 > **Windows app, no Python needed:** download `erdr-gui-<version>-windows.zip` from the
 > [latest release](https://github.com/ktuhtabayev/erdr/releases/latest), unpack it and start
@@ -34,14 +36,15 @@ Step 5  |L| > 1 → g(Sⱼ) − 1 for Sⱼ ∈ L;  g(Sⱼ) = 1 → Sⱼ to D    
 
 | Part | Content | State |
 |---|---|---|
-| Core | Step 0 (8 normalizers, 12 metrics), Steps 1–6, the readings A, B, C and z, the 17 cases | ✓ |
+| Core | Step 0 (8 normalizers, 12 metrics), Steps 1–6, the readings A, B, C and z, the 17 cases, Steps 1–5 as hyperspheres | ✓ |
 | Data | extended `.csv`/`.dat` layout (read and written byte for byte), CSV/Excel tables, the ERDR workbook, Parquet; dataset folder and built-in datasets | ✓ |
 | Configuration | typed (pydantic), YAML/TOML/JSON, presets `literal` and `closest`, hashing | ✓ |
 | Services | runner, repeatable run folders, readings comparison, k sweeps, workbook validation | ✓ |
-| Exports | CSV, JSON, Markdown, LaTeX, Excel (laid out like the workbook), PNG/SVG figures, HTML report, training/validation datasets | ✓ |
-| Interfaces | `erdr` CLI, desktop GUI (PySide6) in the template's design with light and dark themes, portable Windows executable | ✓ |
+| Exports | CSV, JSON, Markdown, LaTeX, Excel (laid out like the workbook), PNG/SVG figures and an animated GIF of the iterations, HTML report, training/validation datasets | ✓ |
+| Visualizations | 2-D map, r and z, priorities, sample sizes, class composition; hyperspheres of every object, neighbourhood strips, radius plane, the spheres of every iteration ([Visualizations](docs/visualizations.md)) | ✓ |
+| Interfaces | `erdr` CLI, desktop GUI (PySide6) in the template's design with light and dark themes and a hypersphere explorer (◀ ▶, Play), portable Windows executable | ✓ |
 | Colours | one colour per meaning in the GUI, Excel, HTML, figures and console — feature types, classes, D and F, parameters, steps, ⚠ non-literal readings (the workbook's legend) | ✓ |
-| Quality | 172 tests (golden: workbook, guide, Table 1; property-based; GUI), 94 % coverage, mypy strict, ruff, Windows CI | ✓ |
+| Quality | 187 tests (golden: workbook, guide, Table 1; property-based; GUI), 95 % coverage, mypy strict, ruff, Windows CI | ✓ |
 
 ## The desktop application without Python
 
@@ -70,9 +73,10 @@ Commands:
 .\.venv\Scripts\erdr.exe run heart-disease-270 --brief          # all 270 objects (|D| = 198 for k = 3)
 .\.venv\Scripts\erdr.exe run heart-disease-270 -p closest       # B = 2 + own-class z (|D| = 75 = Table 1)
 .\.venv\Scripts\erdr.exe run -k 5 -r 211 --metric gower --normalizer rank --k-rule warn
+.\.venv\Scripts\erdr.exe spheres -t 2 -f iteration-2.png       # iteration 2 as spheres (+ figure)
 .\.venv\Scripts\erdr.exe readings --both-z                      # all 16 readings on the sample
 .\.venv\Scripts\erdr.exe sweep heart-disease-270 --k 3-41       # |D| for every odd k
-.\.venv\Scripts\erdr.exe validate                               # every sheet of the workbook (937 checks)
+.\.venv\Scripts\erdr.exe validate                               # every sheet of the workbook (2,927 checks)
 .\.venv\Scripts\erdr.exe run --save --export all                # run folder + every export format
 .\.venv\Scripts\erdr.exe export -f xlsx,html --readings --sweep # export the latest run again
 .\.venv\Scripts\erdr.exe data list ; .\.venv\Scripts\erdr.exe plugins
@@ -103,9 +107,10 @@ configs/            configurations: default (the workbook), Heart-Disease 270 li
 datasets/           default.csv/.dat = Heart-Disease (7, 13, 2); Heart-Disease/… (270, 13, 2)
 docs/               documentation (mkdocs), DECISIONS.md, GUI screenshots
 resources/          the ERDR workbook, the step-by-step guide, the article (read-only)
-scripts/            Windows executable build, GUI screenshots
+scripts/            Windows executable build, GUI screenshots, documentation figures
 src/erdr/
-  core/             pure numerical core: normalizers, metrics, Step 0, Steps 1–6, readings, cases
+  core/             pure numerical core: normalizers, metrics, Step 0, Steps 1–6, readings, cases,
+                    Steps 1–5 as hyperspheres
   config/           typed configuration, presets, YAML/TOML/JSON
   data/             dataset schema, loaders, writers, dataset folder, built-in datasets
   services/         runner, run folders, readings and k sweeps, workbook validation
@@ -117,7 +122,8 @@ tests/              pytest suite: golden (workbook, guide, Table 1), unit, prope
 
 ## Documentation
 
-[The algorithm](docs/algorithm.md) · [Architecture](docs/architecture.md) ·
+[The algorithm](docs/algorithm.md) · [Visualizations](docs/visualizations.md) ·
+[Architecture](docs/architecture.md) ·
 [Configuration](docs/configuration.md) · [Datasets](docs/datasets.md) ·
 [Command line](docs/cli.md) · [Desktop application](docs/gui.md) ·
 [Validation](docs/validation.md) · [Exporting](docs/exporting.md) ·

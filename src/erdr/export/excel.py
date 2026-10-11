@@ -1,7 +1,8 @@
 """The run as an Excel workbook laid out like the ERDR workbook (ADR-012).
 
 Tables that mirror the same sheet of the ERDR workbook are stacked on one sheet, in workbook
-order (*Overview*, *Dataset*, *Normalized Dataset*, *Zhuravlev Distances*, …); the figures go to
+order (*Overview*, *Dataset*, *Normalized Dataset*, *Zhuravlev Distances*, …); a figure that
+belongs to a sheet (the hypersphere figures) goes under that sheet's tables, the others to
 *Charts*. Values are written exactly (no rounding). The styles are the workbook's: dark-blue
 sheet title, blue table title bars, grey-blue column headers, sheet tabs coloured by stage; the
 marks of the cells and headers become the colours of :mod:`erdr.export.theme`, explained by the
@@ -88,6 +89,21 @@ def _write_table(ws: Worksheet, table: Table, top: int) -> int:
     return end + 1
 
 
+FigureItem = tuple[str, Figure] | tuple[str, Figure, str]
+"""A figure for the workbook: (name, figure) or (name, figure, sheet it belongs to)."""
+
+
+def _insert_figure(ws: Worksheet, name: str, figure: Figure, top: int) -> int:
+    """Put ``figure`` with its name from row ``top``; returns the first free row after it."""
+    ws.cell(row=top, column=1, value=name).font = Font(bold=True)
+    buffer = BytesIO()
+    figure.savefig(buffer, format="png", dpi=110)
+    buffer.seek(0)
+    image = Image(buffer)
+    ws.add_image(image, f"A{top + 1}")
+    return top + int(image.height / 20) + 3
+
+
 def _fit_columns(ws: Worksheet) -> None:
     widths: dict[int, int] = {}
     for row in ws.iter_rows():
@@ -129,7 +145,7 @@ def write_workbook(
     *,
     title: str,
     settings: Sequence[tuple[str, str]] = (),
-    figures: Sequence[tuple[str, Figure]] = (),
+    figures: Sequence[FigureItem] = (),
     class_labels: Sequence[object] = (),
 ) -> Path:
     """Write the tables (stacked per workbook sheet), the settings and the figures.
@@ -140,7 +156,8 @@ def write_workbook(
         title: The title on the *Overview* sheet.
         settings: (name, value) pairs shown on the *Overview* sheet; a pair named ``Note`` is a
             reading that is not the literal one and is shown as a warning.
-        figures: (name, figure) pairs placed on the *Charts* sheet.
+        figures: (name, figure) pairs placed on the *Charts* sheet, or (name, figure, sheet)
+            placed under the tables of ``sheet`` (on *Charts* when no table is on it).
         class_labels: The labels of the classes K1, K2, … (named in the colour legend).
     """
     workbook = Workbook()
@@ -173,6 +190,14 @@ def write_workbook(
     _legend(overview, row, tables, class_labels)
     _fit_columns(overview)
 
+    placed: dict[str, list[tuple[str, Figure]]] = {}
+    charted: list[tuple[str, Figure]] = []
+    for item in figures:
+        sheet = item[2] if len(item) == 3 else None
+        if sheet is not None and sheet in sheets:
+            placed.setdefault(sheet, []).append((item[0], item[1]))
+        else:
+            charted.append((item[0], item[1]))
     for name, group in sheets.items():
         ws = workbook.create_sheet(_sheet_name(name, taken))
         _tab(ws, name)
@@ -182,19 +207,15 @@ def write_workbook(
         if len(group) == 1:
             ws.freeze_panes = ws.cell(row=3, column=2)
         _fit_columns(ws)
+        for figure_name, figure in placed.get(name, []):
+            top = _insert_figure(ws, figure_name, figure, top)
 
-    if figures:
+    if charted:
         charts = workbook.create_sheet(_sheet_name("Charts", taken))
         _tab(charts, "Charts")
         top = 1
-        for name, figure in figures:
-            charts.cell(row=top, column=1, value=name).font = Font(bold=True)
-            buffer = BytesIO()
-            figure.savefig(buffer, format="png", dpi=110)
-            buffer.seek(0)
-            image = Image(buffer)
-            charts.add_image(image, f"A{top + 1}")
-            top += int(image.height / 20) + 3
+        for name, figure in charted:
+            top = _insert_figure(charts, name, figure, top)
     path.parent.mkdir(parents=True, exist_ok=True)
     workbook.save(path)
     return path

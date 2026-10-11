@@ -246,9 +246,19 @@ class FigureView(QWidget):
         layout.addWidget(self.canvas, 1)
 
     def show_figure(self, figure: Figure) -> None:
-        """Replace the drawing by ``figure``."""
+        """Replace the drawing by ``figure``, sized to the canvas when it is on screen.
+
+        A figure set after the canvas is laid out keeps its own size until the next resize;
+        it gets the canvas's size at once, as matplotlib's resize handler would give it.
+        """
         figure.set_canvas(self.canvas)
         self.canvas.figure = figure
+        width, height = self.canvas.width(), self.canvas.height()
+        if self.canvas.isVisible() and width > 1 and height > 1:
+            ratio = float(self.canvas.device_pixel_ratio)
+            figure.set_size_inches(
+                width * ratio / figure.dpi, height * ratio / figure.dpi, forward=False
+            )
         self.canvas.draw_idle()  # type: ignore[no-untyped-call]
 
     @property

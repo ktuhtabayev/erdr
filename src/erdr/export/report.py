@@ -1,10 +1,12 @@
 """The run report: one self-contained HTML file with the settings, the figures and the tables.
 
 The figures are inline SVG and the styles are in the file, so the report opens anywhere without
-other files. Cells and column headers take the colours of their marks (:mod:`erdr.export.theme`),
-with the meaning as a tooltip, and the colour legend explains the marks the report uses. Matrix
-tables (m × m) of samples larger than :data:`~erdr.export.tables.MATRIX_LIMIT` objects are left
-out — they stay in the CSV, JSON and Excel exports.
+other files; a figure that belongs to a sheet (the hypersphere figures) stands right before that
+sheet's tables, the others at the top. Cells and column headers take the colours of their marks
+(:mod:`erdr.export.theme`), with the meaning as a tooltip, and the colour legend explains the marks
+the report uses. Matrix tables (m × m) of samples larger than
+:data:`~erdr.export.tables.MATRIX_LIMIT` objects are left out — they stay in the CSV, JSON and
+Excel exports.
 """
 
 from __future__ import annotations
@@ -97,6 +99,11 @@ def legend_html(tables: Sequence[Table], class_labels: Sequence[object] = ()) ->
     return "".join(lines)
 
 
+def figure_html(name: str, figure: Figure) -> str:
+    """One figure as inline SVG."""
+    return f'<figure aria-label="{html.escape(name)}">{svg_text(figure)}</figure>'
+
+
 def table_html(table: Table) -> str:
     """One table as an HTML section."""
     head = "".join(
@@ -122,7 +129,7 @@ def report_html(
     settings: Sequence[tuple[str, str]],
     notes: Sequence[str],
     tables: Sequence[Table],
-    figures: Sequence[tuple[str, Figure]],
+    figures: Sequence[tuple[str, Figure] | tuple[str, Figure, str]],
     m: int,
     footer: str = "",
     class_labels: Sequence[object] = (),
@@ -146,10 +153,18 @@ def report_html(
         parts.append(f"<dt>{html.escape(name)}</dt><dd>{html.escape(value)}</dd>")
     parts.append("</dl>")
     parts.append(legend_html(tables, class_labels))
-    for name, figure in figures:
-        parts.append(f'<figure aria-label="{html.escape(name)}">{svg_text(figure)}</figure>')
+    sheets = {table.sheet for table in tables}
+    placed: dict[str, list[tuple[str, Figure]]] = {}
+    for item in figures:
+        sheet = item[2] if len(item) == 3 else None
+        if sheet is not None and sheet in sheets:
+            placed.setdefault(sheet, []).append((item[0], item[1]))
+        else:
+            parts.append(figure_html(item[0], item[1]))
     skipped = []
     for table in tables:
+        for name, figure in placed.pop(table.sheet, []):  # a sheet's figures before its tables
+            parts.append(figure_html(name, figure))
         if table.matrix and m > MATRIX_LIMIT:
             skipped.append(table.title)
             continue

@@ -5,7 +5,9 @@ Every exporter reads the same plain tables (:mod:`.tables`) and figures (:mod:`.
 formats cannot disagree. :func:`export_result` writes the chosen formats into one folder:
 
 ``csv/<table>.csv`` · ``run.json`` · ``report.md`` · ``latex/<table>.tex`` · ``workbook.xlsx`` ·
-``figures/<figure>.png|svg`` · ``report.html`` · ``datasets/training|validation.dat|csv``
+``figures/<figure>.png|svg`` (with ``figures/hyperspheres/`` and ``figures/iteration-spheres/``
+per object and iteration, and the animation ``figures/iteration-spheres.gif``) ·
+``report.html`` · ``datasets/training|validation.dat|csv``
 """
 
 from __future__ import annotations
@@ -23,10 +25,16 @@ from erdr.data.writers import write_extended
 from erdr.errors import ConfigError
 from erdr.export import excel, report, text
 from erdr.export.figures import (
-    RUN_FIGURES,
+    figure_names,
+    figure_sheet,
+    iteration_animation,
+    iteration_spheres_figure,
+    object_spheres_figure,
     readings_figure,
     run_figure,
     save_figure,
+    sphere_iterations,
+    sphere_objects,
     sweep_figure,
 )
 from erdr.export.tables import MATRIX_LIMIT, Table, readings_table, run_tables, sweep_table
@@ -44,8 +52,8 @@ class ExportOptions:
     """A readings comparison to include (table and figure)."""
     sweep: tuple[SweepRow, ...] | None = None
     """A k sweep to include (table and figure)."""
-    figure_formats: tuple[str, ...] = ("png", "svg")
-    """File types of the figures."""
+    figure_formats: tuple[str, ...] = ("png", "svg", "gif")
+    """File types of the figures; ``gif`` is the animation of the iteration diagrams."""
     dataset_formats: tuple[str, ...] | None = None
     """Formats of the training/validation samples (default: the configuration's)."""
 
@@ -71,7 +79,7 @@ def all_tables(run: ExperimentResult, options: ExportOptions) -> list[Table]:
 
 def all_figures(run: ExperimentResult, options: ExportOptions) -> list[tuple[str, str, Figure]]:
     """(key, name, figure) of the run's figures plus the analysis figures of ``options``."""
-    figures = [(key, name, run_figure(key, run)) for key, (name, _) in RUN_FIGURES.items()]
+    figures = [(key, name, run_figure(key, run)) for key, name in figure_names()]
     if options.readings:
         figures.append(("readings", "Readings", readings_figure(options.readings, run.result.m)))
     if options.sweep:
@@ -156,8 +164,8 @@ def export_latex(run: ExperimentResult, folder: Path, options: ExportOptions) ->
 
 
 def export_xlsx(run: ExperimentResult, folder: Path, options: ExportOptions) -> list[Path]:
-    """``workbook.xlsx``: the tables stacked per workbook sheet, the figures on *Charts*."""
-    figures = [(name, figure) for _, name, figure in all_figures(run, options)]
+    """``workbook.xlsx``: the tables stacked per workbook sheet, the figures on their sheets."""
+    figures = [(name, figure, figure_sheet(key)) for key, name, figure in all_figures(run, options)]
     path = excel.write_workbook(
         folder / "workbook.xlsx",
         all_tables(run, options),
@@ -170,11 +178,31 @@ def export_xlsx(run: ExperimentResult, folder: Path, options: ExportOptions) -> 
 
 
 def export_figures(run: ExperimentResult, folder: Path, options: ExportOptions) -> list[Path]:
-    """Every figure as PNG and SVG (``options.figure_formats``)."""
+    """Every figure as PNG and SVG, the hypersphere diagrams one by one, an animated GIF.
+
+    ``options.figure_formats`` chooses the files; the diagrams of the objects and iterations of the
+    multi-panel figures are also written one by one, and ``gif`` animates the iterations.
+    """
     written: list[Path] = []
+    static = [fmt for fmt in options.figure_formats if fmt != "gif"]
+    target = folder / "figures"
     for key, _, figure in all_figures(run, options):
-        for fmt in options.figure_formats:
-            written.append(save_figure(figure, folder / "figures" / f"{key}.{fmt}"))
+        for fmt in static:
+            written.append(save_figure(figure, target / f"{key}.{fmt}"))
+    width = len(str(run.result.m))
+    singles = [
+        (f"hyperspheres/object-{i + 1:0{width}d}", object_spheres_figure(run, i))
+        for i in sphere_objects(run)
+    ]
+    singles += [
+        (f"iteration-spheres/iteration-{t:0{width}d}", iteration_spheres_figure(run, t))
+        for t in sphere_iterations(run)
+    ]
+    for stem, figure in singles:
+        for fmt in static:
+            written.append(save_figure(figure, target / f"{stem}.{fmt}"))
+    if "gif" in options.figure_formats:
+        written.append(iteration_animation(run, target / "iteration-spheres.gif"))
     return written
 
 
@@ -190,7 +218,9 @@ def export_html(run: ExperimentResult, folder: Path, options: ExportOptions) -> 
         settings=run_settings(run),
         notes=run.notes,
         tables=all_tables(run, options),
-        figures=[(name, figure) for _, name, figure in all_figures(run, options)],
+        figures=[
+            (name, figure, figure_sheet(key)) for key, name, figure in all_figures(run, options)
+        ],
         m=run.result.m,
         footer=f"configuration {run.config_hash[:12]} · dataset {run.dataset_hash[:12]}",
         class_labels=run.dataset.classes,
@@ -219,7 +249,9 @@ EXPORTERS.add("latex", export_latex, aliases=("tex",), summary="LaTeX tables (bo
 EXPORTERS.add(
     "xlsx", export_xlsx, aliases=("excel",), summary="workbook.xlsx laid out like the ERDR workbook"
 )
-EXPORTERS.add("figures", export_figures, summary="PNG and SVG figures")
+EXPORTERS.add(
+    "figures", export_figures, summary="PNG and SVG figures, the iterations as an animated GIF"
+)
 EXPORTERS.add("html", export_html, aliases=("report",), summary="self-contained report.html")
 EXPORTERS.add("datasets", export_datasets, summary="training and validation samples (.dat, .csv)")
 

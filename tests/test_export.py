@@ -10,7 +10,14 @@ import pytest
 from erdr.data import load_dataset
 from erdr.errors import ConfigError
 from erdr.export import EXPORTERS, ExportOptions, export_result, resolve_formats, run_settings
-from erdr.export.figures import RUN_FIGURES, classical_mds, run_figure, save_figure, svg_text
+from erdr.export.figures import (
+    RUN_FIGURES,
+    classical_mds,
+    figure_names,
+    run_figure,
+    save_figure,
+    svg_text,
+)
 from erdr.export.tables import MATRIX_LIMIT, run_tables
 from erdr.export.text import display, exact, latex_escape, to_csv, to_latex, to_markdown
 from erdr.services.analysis import compare_readings, sweep_k
@@ -37,8 +44,14 @@ def test_tables_mirror_the_workbook(default_run: ExperimentResult):
         "neighbours",
         "characteristics",
         "spheres",
+        "enemy-spheres",
+        "k-spheres",
+        "covering",
+        "sphere-checks",
         "queue",
         "iterations",
+        "iteration-spheres",
+        "sphere-trace",
         "counters",
         "routes",
         "composition",
@@ -101,7 +114,7 @@ def test_export_everything(tmp_path: Path, default_run: ExperimentResult, option
     assert "Charts" in book.sheetnames
     assert "Zhuravlev Distances" in book.sheetnames
     html = (tmp_path / "report.html").read_text(encoding="utf-8")
-    assert html.count("<svg") == len(RUN_FIGURES) + 2
+    assert html.count("<svg") == len(figure_names()) + 2
     assert "Not the literal article reading" not in html
     csv_bytes = (tmp_path / "csv" / "characteristics.csv").read_bytes()
     assert csv_bytes.startswith(b"\xef\xbb\xbf")

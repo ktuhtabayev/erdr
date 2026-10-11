@@ -39,6 +39,21 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from erdr.core.algorithm import Decision
+from erdr.core.hyperspheres import (
+    IterationSpheres,
+    Relation,
+    SphereProfile,
+    containing_text,
+    cover_change_text,
+    density_text,
+    iteration_spheres,
+    iteration_summary,
+    iteration_title,
+    possible_cover,
+    relation_meaning,
+    sphere_profile,
+    step1_summary,
+)
 from erdr.core.readings import Readings, ZScope
 from erdr.data.schema import Dataset
 from erdr.export.theme import class_mark
@@ -57,6 +72,12 @@ Cell = str | int | float | None
 """A table cell."""
 MATRIX_LIMIT = 60
 """Matrix tables (m × m) of larger samples are left out of Markdown, LaTeX and HTML (ADR-012)."""
+HYPERSPHERES_STEP1 = "Hyperspheres (Step 1)"
+"""The workbook sheet of the enemy spheres and k-spheres of Step 1."""
+HYPERSPHERES_ITERATIONS = "Hyperspheres (Iterations)"
+"""The workbook sheet of the spheres around the selected object of every iteration."""
+TICK = "✓"
+CROSS = "✗"
 
 
 @dataclass(frozen=True)
@@ -465,6 +486,281 @@ def spheres_table(run: ExperimentResult) -> Table:
     )
 
 
+# ---------------------------------------------------------------- Step 1 as hyperspheres
+
+
+def profile(run: ExperimentResult) -> SphereProfile:
+    """What the enemy sphere and the k-sphere of every object of ``run`` contain."""
+    return sphere_profile(
+        run.distances.matrix, run.result.characteristics, decimals=run.config.erdr.d_decimals
+    )
+
+
+def enemy_spheres_table(run: ExperimentResult) -> Table:
+    """The enemy sphere (Sᵢ, r(Sᵢ)) of every object — sheet *Hyperspheres (Step 1)*."""
+    c = run.result.characteristics
+    p = profile(run)
+    names = run.object_names
+    labels = _labels(run)
+    objects = _class_marks(run)
+    rows: list[tuple[Cell, ...]] = []
+    marks: list[tuple[str | None, ...]] = []
+    for i in range(c.m):
+        g = int(c.g[i])
+        agrees = g == int(p.g_from_spheres[i])
+        boundary = int(p.strictly_inside[i]) == g
+        inside = [names[j] for j in c.order[i] if c.spheres[i, j]]
+        rows.append(
+            (
+                names[i],
+                labels[i],
+                float(c.r[i]),
+                names[c.nearest_enemy[i]],
+                int(p.own_inside[i]),
+                int(p.own_on_sphere[i]),
+                int(p.enemies_inside[i]),
+                int(p.enemies_on_sphere[i]),
+                g,
+                TICK if agrees else CROSS,
+                int(p.closed_count[i]),
+                TICK if boundary else CROSS,
+                ", ".join([f"{names[i]} (itself)", *inside]),
+                density_text(g, int(p.own_on_sphere[i])),
+            )
+        )
+        marks.append(
+            (
+                _sample_mark(run, i),
+                objects[i],
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                "yes" if agrees else "no",
+                None,
+                "yes" if boundary else "no",
+                "own",
+                None,
+            )
+        )
+    return Table(
+        "enemy-spheres",
+        "Step 1 · Enemy spheres (Sᵢ, r(Sᵢ)) — open, through the nearest enemy",
+        (
+            "№",
+            "Class",
+            "r(Sᵢ) · radius",
+            "Nearest enemy (on the sphere)",
+            "Own class strictly inside (Sᵢ excluded)",
+            "Own class on the sphere (ρ = r, not counted)",
+            "Enemies strictly inside",
+            "Enemies on the sphere",
+            "g(Sᵢ) = 1 + inside",
+            "= Step 1",
+            "Closed count ρ ≤ r (all classes)",
+            "Closed count − on the sphere = g",
+            "Members of the enemy sphere (g)",
+            "Reading",
+        ),
+        tuple(rows),
+        tuple(marks),
+        "Only own-class objects strictly inside count (Sᵢ itself included); objects on the "
+        "sphere do not — a closed count ρ ≤ r differs from g exactly by them.",
+        sheet=HYPERSPHERES_STEP1,
+        header_marks=(
+            None,
+            "class",
+            "characteristic",
+            "enemy",
+            "own",
+            "own",
+            "enemy",
+            "enemy",
+            "characteristic",
+            None,
+            None,
+            None,
+            "own",
+            None,
+        ),
+    )
+
+
+def k_spheres_table(run: ExperimentResult) -> Table:
+    """The k-sphere (Sᵢ, z(Sᵢ, k)) against the enemy sphere — sheet *Hyperspheres (Step 1)*."""
+    c = run.result.characteristics
+    p = profile(run)
+    names = run.object_names
+    labels = _labels(run)
+    objects = _class_marks(run)
+    rows: list[tuple[Cell, ...]] = []
+    marks: list[tuple[str | None, ...]] = []
+    for i in range(c.m):
+        agrees = abs(float(p.d_from_ratio[i]) - float(c.d[i])) < 1e-9
+        relation = p.relation[i]
+        rows.append(
+            (
+                names[i],
+                labels[i],
+                names[c.kth_neighbour[i]],
+                float(c.z[i]),
+                float(c.r[i]),
+                int(p.k_members[i]),
+                int(p.k_own[i]),
+                int(p.k_enemies[i]),
+                int(c.enemy_rank[i]),
+                float(p.ratio[i]),
+                float(p.d_from_ratio[i]),
+                TICK if agrees else CROSS,
+                relation.value,
+                relation_meaning(relation, int(c.enemy_rank[i]), c.k, c.z_scope),
+            )
+        )
+        marks.append(
+            (
+                _sample_mark(run, i),
+                objects[i],
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                "priority",
+                "yes" if agrees else "no",
+                "selected" if relation is Relation.EQUAL else None,
+                None,
+            )
+        )
+    scope = "any class" if c.z_scope is ZScope.ALL else "the own class"
+    return Table(
+        "k-spheres",
+        f"Step 1 · k-spheres (Sᵢ, z(Sᵢ, {c.k})) against the enemy spheres — d from the radii",
+        (
+            "№",
+            "Class",
+            "k-th neighbour (on the k-sphere)",
+            f"z(Sᵢ, {c.k}) · radius",
+            "r(Sᵢ) · radius",
+            "Neighbours in the k-sphere (ρ ≤ z)",
+            "… of the own class",
+            "… enemies",
+            "Rank e of the nearest enemy",
+            "q = min(r, z) / max(r, z)",
+            "d = (1 − q) / (1 + q)",
+            "= Step 1",
+            "Relation of the two spheres",
+            "What it means for ERDR",
+        ),
+        tuple(rows),
+        tuple(marks),
+        f"d depends only on the ratio q of the two radii (z over {scope}); marked: the spheres "
+        "coincide (z = r, d = 0) — these objects come first in the Step 2 queue.",
+        sheet=HYPERSPHERES_STEP1,
+        header_marks=(
+            None,
+            "class",
+            None,
+            "characteristic",
+            "characteristic",
+            None,
+            "own",
+            "enemy",
+            "characteristic",
+            "priority",
+            "priority",
+            None,
+            None,
+            None,
+        ),
+    )
+
+
+def covering_table(run: ExperimentResult) -> Table:
+    """The spheres that contain every object, and its L — sheet *Hyperspheres (Step 1)*.
+
+    The forward view (the sphere of Sᵢ counts its members, g) and the inverse view (the spheres
+    that contain Sᵢ can put their owners in L when Sᵢ is selected).
+    """
+    result = run.result
+    c = result.characteristics
+    p = profile(run)
+    names = run.object_names
+    labels = _labels(run)
+    objects = _class_marks(run)
+    rows: list[tuple[Cell, ...]] = []
+    marks: list[tuple[str | None, ...]] = []
+    for i in range(c.m):
+        spheres = p.spheres_containing(i)
+        route = result.routes[i]
+        selected_in = route.processed_in
+        it = result.iterations[selected_in - 1] if selected_in is not None else None
+        possible = possible_cover(int(c.g[i]), len(spheres), result.readings)
+        rows.append(
+            (
+                names[i],
+                labels[i],
+                int(c.g[i]),
+                containing_text(spheres, i, names),
+                len(spheres),
+                selected_in if selected_in is not None else DASH,
+                object_set(it.L, names) if it is not None else f"{DASH} never selected",
+                len(it.L) if it is not None else DASH,
+                cover_change_text(selected_in, len(it.L) if it else 0, possible, result.readings),
+            )
+        )
+        marks.append((_sample_mark(run, i), objects[i], None, "own", None, None, "L", None, None))
+    return Table(
+        "covering",
+        "Step 1 · Forward and inverse view — the spheres that contain Sᵢ and the L of its turn",
+        (
+            "№",
+            "Class",
+            "g(Sᵢ)",
+            "Spheres that contain Sᵢ — own-class Sⱼ with ρ(Sⱼ, Sᵢ) < r(Sⱼ)",
+            "Number",
+            "Selected in iteration",
+            "L when Sᵢ was selected (Step 4)",
+            "|L| then",
+            "Change from the start",
+        ),
+        tuple(rows),
+        tuple(marks),
+        "Row of the sphere matrix: the members of the sphere of Sᵢ (g); its column: the spheres "
+        "that contain Sᵢ — those still in F (and allowed by A and B) form L at Sᵢ's turn.",
+        sheet=HYPERSPHERES_STEP1,
+        header_marks=(None, "class", "characteristic", "own", None, None, "L", "L", None),
+    )
+
+
+def _check_mark(passed: bool) -> str:
+    return "yes" if passed else "no"
+
+
+def sphere_checks_table(run: ExperimentResult) -> Table:
+    """Border and dense objects, the relations of the spheres and the checks of Step 1."""
+    lines = step1_summary(run.result.characteristics, profile(run), run.object_names)
+    rows: list[tuple[Cell, ...]] = [(line.label, line.value, line.text) for line in lines]
+    marks: list[tuple[str | None, ...]] = [
+        (None, None, None) if line.passed is None else (None, *[_check_mark(line.passed)] * 2)
+        for line in lines
+    ]
+    return Table(
+        "sphere-checks",
+        "Step 1 · Spheres — border and dense objects, relations and checks",
+        ("Quantity", "Value", "Objects"),
+        tuple(rows),
+        tuple(marks),
+        "The spheres (r, z) never change during ERDR; Steps 4–5 only change F and lower g.",
+        sheet=HYPERSPHERES_STEP1,
+    )
+
+
 def queue_table(run: ExperimentResult) -> Table:
     """Step 2 · the static priority order — sheet *Priority Queue*."""
     c = run.result.characteristics
@@ -587,6 +883,309 @@ def iterations_table(run: ExperimentResult) -> Table:
             "D",
             None,
         ),
+    )
+
+
+# ---------------------------------------------------------------- Steps 2–5 as hyperspheres
+
+
+def iteration_view(run: ExperimentResult, t: int) -> IterationSpheres:
+    """Iteration ``t`` of ``run`` as spheres around its selected object (Step 6 past the end)."""
+    return iteration_spheres(run.result, run.distances.matrix, t)
+
+
+def iteration_heading(run: ExperimentResult, t: int) -> str:
+    """``Iteration 1  ·  Sᵢ = S₁  ·  L = {S₁, S₂, S₅}  ·  |L| > 1 → Step 5 corrects g``."""
+    names = run.object_names
+    if t > len(run.result.iterations):
+        return iteration_title(t, None)
+    it = run.result.iterations[t - 1]
+    return iteration_title(t, names[it.selected], object_set(it.L, names), it.decision.value)
+
+
+def iteration_spheres_table(run: ExperimentResult) -> Table:
+    """Every iteration as spheres around Sᵢ — the overview of *Hyperspheres (Iterations)*."""
+    names = run.object_names
+    labels = _labels(run)
+    objects = _class_marks(run)
+    rows: list[tuple[Cell, ...]] = []
+    marks: list[tuple[str | None, ...]] = []
+    for it in run.result.iterations:
+        view = iteration_view(run, it.number)
+        moved = moves_text([(mv.object, mv.step) for mv in it.moves], names)
+        rows.append(
+            (
+                it.number,
+                names[it.selected],
+                labels[it.selected],
+                float(it.r),
+                object_set(view.candidates, names),
+                object_set(view.covering, names),
+                object_set(view.covering_in_d, names),
+                object_set(it.L, names),
+                len(it.L),
+                it.decision.value + ("" if moved == DASH else f"  ·  {moved}"),
+            )
+        )
+        marks.append(
+            (
+                None,
+                "selected",
+                objects[it.selected],
+                None,
+                None,
+                "own",
+                "D" if view.covering_in_d else None,
+                "L",
+                None,
+                "moved" if it.moves else None,
+            )
+        )
+    return Table(
+        "iteration-spheres",
+        "Steps 2–5 · Spheres around the selected Sᵢ — the spheres in F that contain Sᵢ give L",
+        (
+            "t",
+            "Selected Sᵢ",
+            "Class",
+            "r(Sᵢ)",
+            "Own-class objects in F (Sᵢ included) — the candidates for L",
+            "… whose sphere contains Sᵢ",
+            "In D, but the sphere would contain Sᵢ",
+            "L (Step 4)",
+            "|L|",
+            "Decision  ·  moved to D",
+        ),
+        tuple(rows),
+        tuple(marks),
+        "The spheres never change; only F and the counters g do. A sphere of an object already "
+        "in D no longer counts, even where it contains Sᵢ.",
+        sheet=HYPERSPHERES_ITERATIONS,
+        header_marks=(
+            None,
+            "selected",
+            "class",
+            "characteristic",
+            "own",
+            "own",
+            "D",
+            "L",
+            "L",
+            None,
+        ),
+    )
+
+
+ITERATION_DETAIL_COLUMNS = (
+    "Sⱼ",
+    "Class",
+    "In F",
+    "Own class of Sᵢ",
+    "ρ(Sⱼ, Sᵢ)",
+    "r(Sⱼ)",
+    "r(Sⱼ) − ρ(Sⱼ, Sᵢ)",
+    "Sphere of Sⱼ contains Sᵢ",
+    "g before",
+    "g > 1",
+    "Allowed (A, B)",
+    "Sⱼ ∈ L",
+    "g after",
+    "Moves to D",
+    "Role in this iteration",
+)
+"""The columns of one iteration's spheres (the workbook's iteration block)."""
+_DETAIL_HEADER_MARKS: tuple[str | None, ...] = (
+    None,
+    "class",
+    "F",
+    "own",
+    None,
+    "characteristic",
+    None,
+    "own",
+    "characteristic",
+    None,
+    "parameter",
+    "L",
+    "characteristic",
+    "D",
+    None,
+)
+
+
+def _detail_rows(
+    run: ExperimentResult, view: IterationSpheres
+) -> tuple[list[tuple[Cell, ...]], list[tuple[str | None, ...]]]:
+    """One row per object: its sphere in iteration ``view.number`` (Step 6: the final state)."""
+    names = run.object_names
+    labels = _labels(run)
+    objects = _class_marks(run)
+    rows: list[tuple[Cell, ...]] = []
+    marks: list[tuple[str | None, ...]] = []
+    for j in range(view.m):
+        stop = view.stop
+        distance: Cell = DASH if stop else float(view.distance[j])
+        margin: Cell = DASH if stop else float(view.margin[j])
+        moved = int(view.moved_by[j])
+        rows.append(
+            (
+                names[j],
+                labels[j],
+                int(view.in_f[j]),
+                int(view.own_class[j]),
+                distance,
+                float(view.radius[j]),
+                margin,
+                int(view.contains[j]),
+                int(view.g_before[j]),
+                int(view.g_before[j] > 1),
+                int(view.allowed[j]),
+                int(view.in_l[j]),
+                int(view.g_after[j]),
+                f"Step {moved}" if moved else DASH,
+                view.role(j),
+            )
+        )
+        own = "own" if view.own_class[j] else ("enemy" if not stop else None)
+        marks.append(
+            (
+                "selected" if j == view.selected else None,
+                objects[j],
+                "F" if view.in_f[j] else "D",
+                own,
+                None,
+                None,
+                None,
+                "own" if view.contains[j] and view.own_class[j] else None,
+                None,
+                None,
+                "warning" if view.own_class[j] and not view.allowed[j] else None,
+                "L" if view.in_l[j] else None,
+                "decreased" if view.g_after[j] < view.g_before[j] else None,
+                "moved" if moved else None,
+                None,
+            )
+        )
+    return rows, marks
+
+
+def iteration_detail_table(run: ExperimentResult, t: int) -> Table:
+    """Every object's sphere in iteration ``t`` — one block of *Hyperspheres (Iterations)*.
+
+    Its :attr:`Table.extra` holds the block's summary (L, counters, moves, sizes, cases, check).
+    """
+    view = iteration_view(run, t)
+    rows, marks = _detail_rows(run, view)
+    summary = iteration_summary_lines(run, view)
+    return Table(
+        f"iteration-spheres-{t}",
+        iteration_heading(run, t),
+        ITERATION_DETAIL_COLUMNS,
+        tuple(rows),
+        tuple(marks),
+        "Sⱼ ∈ L exactly when Sⱼ is in F, of the class of Sᵢ, its sphere contains Sᵢ "
+        "(r(Sⱼ) − ρ(Sⱼ, Sᵢ) > 0), g(Sⱼ) > 1 and the readings A and B allow it.",
+        sheet=HYPERSPHERES_ITERATIONS,
+        extra=dict(summary),
+        header_marks=_DETAIL_HEADER_MARKS,
+    )
+
+
+def iteration_summary_lines(
+    run: ExperimentResult, view: IterationSpheres
+) -> tuple[tuple[str, str], ...]:
+    """The summary of one iteration's spheres (L, counters, moves, sizes, cases, check)."""
+    return iteration_summary(run.result, view, run.cases, run.object_names)
+
+
+def sphere_trace_table(run: ExperimentResult) -> list[Table]:
+    """Every object's sphere in every iteration — the blocks of *Hyperspheres (Iterations)*.
+
+    m rows per iteration: built for samples up to :data:`MATRIX_LIMIT` objects only (the
+    desktop application shows any iteration of a larger sample on demand).
+    """
+    if run.result.m > MATRIX_LIMIT:
+        return []
+    names = run.object_names
+    rows: list[tuple[Cell, ...]] = []
+    marks: list[tuple[str | None, ...]] = []
+    for it in run.result.iterations:
+        detail, detail_marks = _detail_rows(run, iteration_view(run, it.number))
+        rows += [(it.number, names[it.selected], *row) for row in detail]
+        marks += [(None, "selected", *mark) for mark in detail_marks]
+    return [
+        Table(
+            "sphere-trace",
+            "Steps 2–5 · Every sphere in every iteration — r(Sⱼ) − ρ(Sⱼ, Sᵢ) > 0 puts Sⱼ in L",
+            ("t", "Sᵢ", *ITERATION_DETAIL_COLUMNS),
+            tuple(rows),
+            tuple(marks),
+            "One block per iteration (the workbook's); Sⱼ ∈ L = in F × own class × contains Sᵢ "
+            "× g > 1 × allowed by A and B.",
+            True,
+            HYPERSPHERES_ITERATIONS,
+            header_marks=(None, "selected", *_DETAIL_HEADER_MARKS),
+        )
+    ]
+
+
+def object_spheres_table(run: ExperimentResult, i: int) -> Table:
+    """Everything the two spheres of Sᵢ say, as a list of figures (one object of Step 1)."""
+    result = run.result
+    c = result.characteristics
+    p = profile(run)
+    names = run.object_names
+    spheres = p.spheres_containing(i)
+    route = result.routes[i]
+    selected_in = route.processed_in
+    it = result.iterations[selected_in - 1] if selected_in is not None else None
+    inside = [names[j] for j in c.order[i] if c.spheres[i, j]]
+    possible = possible_cover(int(c.g[i]), len(spheres), result.readings)
+    rows: list[tuple[Cell, ...]] = [
+        ("Class", f"{class_name(int(c.classes[i]))} (class {_labels(run)[i]})"),
+        ("r(Sᵢ) — radius of the enemy sphere", float(c.r[i])),
+        ("Nearest enemy (on the sphere)", names[c.nearest_enemy[i]]),
+        ("Own class strictly inside (Sᵢ excluded)", int(p.own_inside[i])),
+        ("Own class on the sphere (not counted)", int(p.own_on_sphere[i])),
+        ("g(Sᵢ) — members of the enemy sphere", int(c.g[i])),
+        ("Members", ", ".join([f"{names[i]} (itself)", *inside])),
+        ("Reading", density_text(int(c.g[i]), int(p.own_on_sphere[i]))),
+        (f"z(Sᵢ, {c.k}) — radius of the k-sphere", float(c.z[i])),
+        ("k-th neighbour (on the k-sphere)", names[c.kth_neighbour[i]]),
+        (
+            "Neighbours in the k-sphere · own class · enemies",
+            (f"{int(p.k_members[i])} · {int(p.k_own[i])} · {int(p.k_enemies[i])}"),
+        ),
+        ("Rank e of the nearest enemy", int(c.enemy_rank[i])),
+        ("q = min(r, z) / max(r, z)", float(p.ratio[i])),
+        ("d(Sᵢ) = (1 − q) / (1 + q)", float(c.d[i])),
+        ("Relation of the two spheres", p.relation[i].value),
+        ("What it means", relation_meaning(p.relation[i], int(c.enemy_rank[i]), c.k, c.z_scope)),
+        ("Step 2 queue position", int(c.position[i])),
+        ("Spheres that contain Sᵢ", containing_text(spheres, i, names)),
+        ("Selected in iteration", selected_in if selected_in is not None else DASH),
+        ("L when Sᵢ was selected", object_set(it.L, names) if it else f"{DASH} never selected"),
+        (
+            "Change from the start",
+            cover_change_text(selected_in, len(it.L) if it else 0, possible, result.readings),
+        ),
+        ("Sample", "D · training" if route.in_training else "F · validation"),
+    ]
+    marks: list[tuple[str | None, ...]] = [(None, None)] * len(rows)
+    marks[0] = (None, class_mark(int(c.classes[i])))
+    for row in (1, 5, 8, 11):
+        marks[row] = ("characteristic", None)
+    marks[13] = ("priority", "priority")
+    marks[6] = (None, "own")
+    marks[19] = (None, "L")
+    marks[-1] = (None, _sample_mark(run, i))
+    return Table(
+        f"object-spheres-{i + 1}",
+        f"Step 1 · The spheres of {names[i]}",
+        ("Figure", "Value"),
+        tuple(rows),
+        tuple(marks),
+        sheet=HYPERSPHERES_STEP1,
     )
 
 
@@ -732,8 +1331,14 @@ RUN_TABLES: tuple[tuple[str, Callable[[ExperimentResult], Table | list[Table]]],
     ("neighbours", neighbours_table),
     ("characteristics", characteristics_table),
     ("spheres", spheres_table),
+    ("enemy-spheres", enemy_spheres_table),
+    ("k-spheres", k_spheres_table),
+    ("covering", covering_table),
+    ("sphere-checks", sphere_checks_table),
     ("queue", queue_table),
     ("iterations", iterations_table),
+    ("iteration-spheres", iteration_spheres_table),
+    ("sphere-trace", sphere_trace_table),
     ("counters", counters_table),
     ("routes", routes_table),
     ("composition", composition_table),

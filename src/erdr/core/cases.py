@@ -172,6 +172,24 @@ CASES: tuple[CaseDefinition, ...] = (
 ITERATION_CASES = (6, 7, 8, 9, 10, 11, 12, 13, 15)
 """Cases detected per iteration (the per-iteration flags of the checklist)."""
 
+SHORT_TITLES: dict[int, str] = {
+    6: "|L| = 1, L = {Sᵢ}",
+    7: "|L| = 1, L = {Sⱼ}",
+    8: "|L| = 0, Sᵢ stays in F",
+    9: "Step 5 move",
+    10: "g lowered, no move",
+    11: "moved before its turn",
+    12: "processed object moved",
+    13: "Sᵢ in its own L",
+    15: "two moves in one Step 5",
+}
+"""The iteration cases in a few words (sheet *Hyperspheres (Iterations)*)."""
+
+
+def cases_in_iteration(cases: tuple[CaseResult, ...], t: int) -> tuple[int, ...]:
+    """The numbers of the iteration cases that occur in iteration ``t``."""
+    return tuple(case.case.number for case in cases if t in case.iterations)
+
 
 def _iteration_flags(result: ERDRResult) -> dict[int, list[int]]:
     """For every iteration case, the iterations in which it occurs."""

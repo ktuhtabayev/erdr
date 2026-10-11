@@ -9,16 +9,18 @@ saved run first) or the GUI's Export page. `all` is every format.
 | `json` | `run.json` | every table, the settings, notes and warnings |
 | `markdown` | `report.md` | the settings and every table |
 | `latex` | `latex/<table>.tex`, `latex/tables.tex` | booktabs tables, ASCII only (S$_{1}$, $\rho$) |
-| `xlsx` | `workbook.xlsx` | tables stacked per sheet like the ERDR workbook; figures on *Charts*; the workbook's colours and legend |
-| `figures` | `figures/<figure>.png`, `.svg` | the 2-D map, r and z, priorities, sample sizes, class composition (+ readings, sweep) |
-| `html` | `report.html` | one self-contained page: settings, figures (inline SVG), tables |
+| `xlsx` | `workbook.xlsx` | tables stacked per sheet like the ERDR workbook; the hypersphere figures on the *Hyperspheres* sheets, the others on *Charts*; the workbook's colours and legend |
+| `figures` | `figures/<figure>.png`, `.svg`; `figures/hyperspheres/object-N`, `figures/iteration-spheres/iteration-N`; `figures/iteration-spheres.gif` | the 2-D map, r and z, priorities, sample sizes, class composition, the hypersphere figures (every object's spheres, the strips, the radius plane, every iteration's spheres — also one by one) and the iterations as an animation (+ readings, sweep) |
+| `html` | `report.html` | one self-contained page: settings, figures (inline SVG; the hypersphere figures right before their tables), tables |
 | `datasets` | `datasets/training|validation.dat|csv` | D and F in the author's extended layout |
 
 The tables mirror the workbook's sheets: key results, dataset, normalized data, ρ (and ρ_I, ρ_J),
-sorted neighbours, Step 1, enemy spheres, queue, iterations, counters, routes (D and F), class
-composition, cases — plus the readings comparison and the k sweep when they are included. For
-samples larger than 60 objects the m × m tables are left out of Markdown, LaTeX and HTML (they
-stay in CSV, JSON and Excel).
+sorted neighbours, Step 1, enemy spheres, the hypersphere tables of Step 1 (`enemy-spheres`,
+`k-spheres`, `covering`, `sphere-checks`), queue, iterations, the spheres per iteration
+(`iteration-spheres`, `sphere-trace`), counters, routes (D and F), class composition, cases — plus
+the readings comparison and the k sweep when they are included. For samples larger than 60
+objects the m × m tables are left out of Markdown, LaTeX and HTML (they stay in CSV, JSON and
+Excel); the sphere trace (m rows per iteration) is built for samples up to 60 objects only.
 
 ## Colours
 
@@ -40,7 +42,11 @@ colour-vision deficiency. In every figure of a run the colour is the class, whic
 shape tells as well, and the fill is the sample (filled = D, hollow = F), so nothing rests on
 colour alone. The sample sizes are drawn in the colours of D and F; a reading keeps its colour in
 every figure (literal green, closest blue). The 2-D map is a classical multidimensional scaling of
-ρ — positions are approximate.
+ρ — positions are approximate. The hypersphere figures keep these rules: a sphere is drawn in its
+owner's class colour and its state is told by its line — the enemy sphere solid, the k-sphere
+dashed; in an iteration a sphere in L solid with the yellow of L, in F dashed, in D dotted
+([Visualizations](visualizations.md)). `figure_formats` of `ExportOptions` chooses the files:
+`png`, `svg` and `gif` (the animation).
 
 ![The sample sizes through the iterations](images/gui/results-figure.png)
 

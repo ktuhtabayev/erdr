@@ -19,9 +19,11 @@ Status values: *accepted*, *superseded by ADR-n*.
 
 - `resources/Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` specifies every
   computation; its cached cell values are acceptance tests (tolerance 1e-9).
-- `erdr validate` reads the workbook's inputs (Dataset, Parameters) and compares 937 values on
-  13 sheets, including the workbook's own *Validation* sheet (53 checks) and the 270-object
-  *Article Table 1 Check* (built from its *Source Dataset (270)* sheet). All pass.
+- `erdr validate` reads the workbook's inputs (Dataset, Parameters) and compares 2,927 values on
+  16 sheets, including the workbook's own *Validation* sheet (53 checks), the 270-object
+  *Article Table 1 Check* (built from its *Source Dataset (270)* sheet) and, since the workbook's
+  hypersphere sheets (ADR-020), *Hyperspheres (Step 1)*, *Hyperspheres (Iterations)* and
+  *Hypersphere Data*. All pass (937 values on 13 sheets before ADR-020).
 - The step-by-step guide (`resources/Interpretation/…docx`) is a second oracle: its worked example
   is a golden test and a built-in dataset.
 - The workbook mentions a reference engine *erdrlab*; no such code exists in the resources, so the
@@ -264,5 +266,75 @@ data or logic.
   set.
 - The template project is only read, never changed. Tints keep their light fill and dark ink in
   the dark theme (ADR-018).
+
+No numerical result changes.
+
+## ADR-020 — Steps 1–5 as hyperspheres, in the project's own style (author)
+
+*Accepted, 2026-10-11.*
+
+**Author.** The ERDR workbook was updated with hypersphere sheets. Take from it every
+visualization that explains the algorithm, add our own where useful — from the input data through
+the intermediate calculations to the result — place each where it supports its calculation, make
+them dynamic where appropriate, and keep the project's current styling and formatting unchanged:
+the new visuals follow the same style and formats.
+
+- **The workbook's new sheets.** *Hyperspheres (Step 1)* (the enemy sphere (Sᵢ, r(Sᵢ)) and the
+  k-sphere (Sᵢ, z(Sᵢ, k)) of every object, the spheres that contain each object, a summary with
+  four checks, neighbourhood strips, the radius plane and one sphere diagram per object),
+  *Hyperspheres (Iterations)* (per iteration, the enemy spheres of the own-class objects around the
+  selected Sᵢ — the spheres in F that contain Sᵢ give L) and *Hypersphere Data* (the diagrams'
+  coordinates). No existing sheet changed except the workbook's index; `erdr validate` passed
+  unchanged on the new file.
+- **One core, no I/O.** `erdr.core.hyperspheres` computes what the sheets show: per object the
+  own class strictly inside the enemy sphere and on it, the enemies on it, the closed count ρ ≤ r,
+  the k-sphere's members, q = min(r, z)/max(r, z) and d = (1 − q)/(1 + q), the relation of the two
+  spheres; per iteration every object's distance to Sᵢ, its radius, whether its sphere contains Sᵢ,
+  its counter before and after, whether readings A and B allow it, L and the moves; the workbook's
+  texts (roles, readings of a sphere, the change of L since the start) and the layout of the
+  diagrams (true distance from the centre, the centre's neighbour order clockwise from the top at
+  equal angles). L rebuilt from the sphere test alone equals the engine's L in every iteration —
+  a property test on random samples with ties and every reading checks it.
+- **Exact where the workbook is silent.** When an object coincides with an enemy, r = 0 and g = 0
+  (ADR-008): the object is not inside its own empty sphere, so g = [r > 0] + the own class strictly
+  inside, and the closed count less every object on the sphere is g. The workbook's sample never
+  has r = 0; its checks read the same.
+- **Validation.** The validator now compares the three new sheets too: 235 + 805 + 950 checks — the
+  sphere tables and checks, every iteration's block (also the Step 6 blocks), the diagrams'
+  positions, ranks and angles, the strips, the radius plane and its lines of equal d. 2,927 checks
+  in all, every one passing.
+- **Tables** (`erdr.export.tables`, ADR-012): *enemy-spheres*, *k-spheres*, *covering*,
+  *sphere-checks* (sheet *Hyperspheres (Step 1)*), *iteration-spheres* (one row per iteration) and
+  *sphere-trace* (every object in every iteration — m rows per iteration, so it is built for samples
+  up to 60 objects only; the desktop application shows any iteration of a larger sample on
+  demand). They use the existing marks only.
+- **Figures** in the project's style, not the workbook's chart styling: the colour of a mark is its
+  class (K1 blue, K2 orange …), as in every figure of a run; nothing new is coloured. A sphere's
+  state is told by its line and fill — the enemy sphere solid, the k-sphere dashed; in an
+  iteration a sphere in L solid with the yellow of L (the tables' colour of L), in F but not in L
+  dashed, of an object already in D dotted; markers filled in D, hollow in F, as on the 2-D map.
+  The workbook draws L gold; next to K2's orange it fails the colour-vision check (ΔE 1.6
+  deuteranopia, 9.4 normal vision), so the figures do not use it. Figures: *hyperspheres* (every
+  object's spheres on one scale, up to 12 panels — for larger samples the first 12 of the queue),
+  *strips*, *radius-plane*, *iteration-spheres* (iterations 1 … 12) and, one by one, the object and
+  iteration diagrams; above 36 objects the diagrams leave out their spokes, draw only the spheres
+  that contain Sᵢ and rasterize their markers inside SVG.
+- **Placement.** The sphere figures go where their calculation is: on the *Hyperspheres* sheets of
+  the Excel export (the other figures stay on *Charts*), right before their tables in the HTML
+  report (the others stay at the top), in `figures/` with `figures/hyperspheres/` and
+  `figures/iteration-spheres/` for the single diagrams. The new sheets carry the Steps 1–5 tab
+  colour.
+- **Dynamic.** The Results page has a *Hyperspheres* tab: the spheres of any object, the spheres
+  of any iteration, the strips or the radius plane, with ◀ ▶ and *Play* (1.6 s per step, stops at
+  Step 6), the matching table, its legend and the block's summary; a double click on an object's or
+  an iteration's row of a table opens it there. The figures export also writes
+  `figures/iteration-spheres.gif`, the iterations as an animation (`gif` in the figure formats).
+  `erdr spheres` prints the same tables and saves the same figures (`--object`, `--iteration`,
+  `--figure`).
+- **Two GUI fixes found on the way.** A figure shown after its canvas was laid out kept its own
+  size (the canvas clipped it) — `FigureView` now gives it the canvas's size, as matplotlib's resize
+  handler would. The Results page cleared its tabs before the loop that deletes them, so the tables
+  of earlier runs were only detached; the loop now deletes them, and the explorer is kept across
+  runs.
 
 No numerical result changes.

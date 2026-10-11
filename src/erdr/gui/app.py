@@ -84,9 +84,9 @@ def self_test(report: Path | None = None) -> int:
     """Check an installation without showing a window; 0 if every check passed.
 
     Loads the default dataset, runs ERDR in the worker thread (it must give the workbook's
-    D = {S₁, S₂, S₅, S₆, S₇} on the default dataset), shows a table and a figure, compares the
-    readings and exports every format into a temporary folder. The result goes to ``report``
-    (a windowed program has no console) and the exit code.
+    D = {S₁, S₂, S₅, S₆, S₇} on the default dataset), shows a table, a figure and the hypersphere
+    explorer, compares the readings and exports every format into a temporary folder. The result
+    goes to ``report`` (a windowed program has no console) and the exit code.
     """
     lines = [f"erdr {__version__} self-test"]
     passed = True
@@ -134,6 +134,15 @@ def self_test(report: Path | None = None) -> int:
             )
             window.results_page.show_tab("figures")
             check("figure drawn", len(window.results_page.figure_view.figure.axes) > 0)
+            explorer = window.results_page.explorer
+            window.results_page.show_tab("explorer")
+            explorer.show_iteration(1)
+            explorer.step(1)
+            check(
+                "hypersphere explorer",
+                len(explorer.figure_view.figure.axes) > 0
+                and explorer.table_view.model() is not None,
+            )
             compared: list[bool] = []
             window.state.analysisChanged.connect(lambda: compared.append(True))
             window.analysis_page.compare()

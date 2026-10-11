@@ -29,6 +29,7 @@ theme:
 nav:
   - Home: index.md
   - The algorithm: algorithm.md
+  - Visualizations: visualizations.md
   - Architecture: architecture.md
   - Configuration: configuration.md
   - Datasets: datasets.md

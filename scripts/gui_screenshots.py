@@ -63,20 +63,35 @@ def main() -> int:
     window.analysis_page.sweep()
     wait_for(window.analysis_page)
     window.analysis_page._show_readings_figure()
+    explorer = window.results_page.explorer
     shots = [
-        ("dataset", window.dataset_page, None),
-        ("configure", window.configure_page, None),
-        ("run", window.run_page, None),
-        ("results-iterations", window.results_page, "iterations"),
-        ("results-characteristics", window.results_page, "characteristics"),
-        ("results-figure", window.results_page, "figures"),
-        ("readings", window.analysis_page, None),
-        ("export", window.export_page, None),
+        ("dataset", window.dataset_page, None, None),
+        ("configure", window.configure_page, None, None),
+        ("run", window.run_page, None, None),
+        ("results-iterations", window.results_page, "iterations", None),
+        ("results-characteristics", window.results_page, "characteristics", None),
+        ("results-figure", window.results_page, "figures", None),
+        (
+            "results-spheres-object",
+            window.results_page,
+            "explorer",
+            lambda: explorer.show_object(1),
+        ),
+        (
+            "results-spheres-iteration",
+            window.results_page,
+            "explorer",
+            lambda: explorer.show_iteration(2),
+        ),
+        ("readings", window.analysis_page, None, None),
+        ("export", window.export_page, None, None),
     ]
-    for name, page, tab in shots:
+    for name, page, tab, prepare in shots:
         window.go_to(page)
         if tab is not None:
             window.results_page.show_tab(tab)
+        if prepare is not None:
+            prepare()
         settle()
         target = OUT / (f"{name}.png" if theme == "light" else f"{theme}-{name}.png")
         window.grab().save(str(target))

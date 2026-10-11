@@ -10,6 +10,7 @@ Redirected output has no colour codes, and `NO_COLOR=1` turns colour off.
 | Command | What it does |
 |---|---|
 | `erdr run [DATASET] [-c FILE]` | runs ERDR; prints Step 1, every iteration, D, F, the routes and the cases (`--brief` for the result only, `--all` for every row) |
+| `erdr spheres [DATASET] [-s OBJECT \| -t ITERATION] [-f FIGURE]` | Steps 1–5 as hyperspheres: every object's spheres, one object's, or one iteration's; saves the figure |
 | `erdr readings [DATASET] [--both-z]` | every combination of the readings A, B, C (and the own-class z) |
 | `erdr sweep [DATASET] [--k 3-41] [-r 111 -r 121:own]` | \|D\| and its class composition for many k and readings |
 | `erdr validate [--against WORKBOOK] [--fast] [--details]` | the package against every computed sheet of the ERDR workbook |
@@ -35,6 +36,19 @@ Step 1 and the trace, the training and validation samples); `--export FORMATS` w
 formats into `<run>/export` or `--out`. Overrides are applied to the configuration file's values
 and validated.
 
+## erdr spheres
+
+```powershell
+erdr spheres                              # every object's enemy sphere and k-sphere, the checks,
+                                          # and the spheres around Sᵢ in every iteration
+erdr spheres --object S2 -f s2.svg        # the two spheres of S₂, and their diagram
+erdr spheres -t 2 -f iteration-2.png      # iteration 2: every object's sphere, L, the moves
+erdr spheres heart-disease-270 -p closest -t 1
+```
+
+Without `--object` or `--iteration`, `--figure` saves the spheres of every object (up to 12
+panels). The settings options are those of `erdr run`; a non-literal reading is flagged with ⚠.
+
 ## erdr readings and erdr sweep
 
 ```text
@@ -56,8 +70,10 @@ $ erdr validate
 ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx  ·  tolerance 1e-09
   Parameters                     5 checks  ✓
   …
+  Hyperspheres (Step 1)        235 checks  ✓
+  …
   Validation                    53 checks  ✓
-  937 checks
+  2927 checks
 validation passed
 ```
 
