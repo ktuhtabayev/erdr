@@ -1,9 +1,10 @@
 # created_date:  16.10.2026
-# updated_date:  16.10.2026
+# updated_date:  17.10.2026
 
 Fayllar:
 	Cancer (589, 44, 2)   - miqdoriy alomatlar.
-	Cancer-N (589, 44, 2) - shu alomatlarning nominal versiyasi (har bir alomat 1/2 qiymatli).
+	Cancer-N (589, 44, 2) - shu alomatlarning nominal versiyasi (har bir alomat 1/2 qiymatli);
+	                        bu papkada yo'q.
 
 Obyektlar soni – 589 ta.
 
@@ -11,6 +12,8 @@ Alomatlar soni – 44 ta (sinf ustuni bu songa kirmaydi).
 
 !!! 1-satr harakteristik vektor.
 !!! Oxirgi satr alomat turlarini ko'rsatadi: 0 - nominal, 1 - miqdoriy.
+!!! 17.10.2026: .dat fayl default.dat formatiga o'tkazildi (LF qator oxiri, qiymatlar
+!!! o'nli kasr ko'rinishida: 4 -> 4.0); qiymatlar o'zgarmagan, .csv bilan tekshirilgan.
 
 #######################################################
 

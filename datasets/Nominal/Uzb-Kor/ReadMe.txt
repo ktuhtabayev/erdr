@@ -1,11 +1,13 @@
 # created_date:  05.03.2026
-# updated_date:  16.10.2026
+# updated_date:  17.10.2026
 
 Obyektlar soni – 100 ta.
 
 Alomatlar soni – 24 ta (sinf ustuni bu songa kirmaydi).
 
 !!! 1-satr harakteristik vektor.
+!!! 17.10.2026: .dat fayl default.dat formatiga o‘tkazildi (LF qator oxiri, qiymatlar
+!!! o‘nli kasr ko‘rinishida: 4 -> 4.0); qiymatlar o‘zgarmagan, .csv bilan tekshirilgan.
 !!! Ayrim savollarga javob berilmagan 0,
 !!! Ayrim savollarga bir nechta variant tanlangan (123)
 
