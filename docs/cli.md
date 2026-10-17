@@ -15,7 +15,7 @@ Redirected output has no colour codes, and `NO_COLOR=1` turns colour off.
 | `erdr sweep [DATASET] [--k 3-41] [-r 111 -r 121:own]` | \|D\| and its class composition for many k and readings |
 | `erdr validate [--against WORKBOOK] [--fast] [--details]` | the package against every computed sheet of the ERDR workbook |
 | `erdr runs` · `erdr export [RUN] -f FORMATS` | list run folders; repeat a saved run and export it (`--readings`, `--sweep`) |
-| `erdr data list` · `check` · `info [DATASET]` | the dataset folder, its checks, one dataset's summary |
+| `erdr data list` · `check [DATASET…]` · `info [DATASET] [-c FILE]` | the dataset folder by type, its checks (type folders, file conventions), one dataset's summary (type, metric, memory) |
 | `erdr config show` · `init FILE` · `check FILE` | presets and configuration files |
 | `erdr plugins` | normalizers, metrics, dataset formats, export formats, built-in datasets |
 | `erdr gui [DATASET] [-c FILE]` | the desktop application |
@@ -28,6 +28,7 @@ erdr run heart-disease-270 --brief -k 5
 erdr run -p closest heart-disease-270            # preset readings
 erdr run -r 211 --z-scope own-class -k 1 --k-rule warn
 erdr run --metric minkowski --normalizer robust  # other Step 0 plug-ins (defaults for their parameters)
+erdr run uzb-kor-100 --brief                     # a nominal dataset: metric hamming (auto)
 erdr run -c configs\heart-disease-270.yaml --save --export all
 ```
 
@@ -35,6 +36,39 @@ erdr run -c configs\heart-disease-270.yaml --save --export all
 Step 1 and the trace, the training and validation samples); `--export FORMATS` writes the chosen
 formats into `<run>/export` or `--out`. Overrides are applied to the configuration file's values
 and validated.
+
+## erdr data
+
+```text
+> erdr data list
+datasets folder: D:\PhD\CODING\erdr\datasets
+  default                    default                            (7, 13, 2)       .dat, .csv
+Quantitative/  every feature quantitative · metric (auto): manhattan
+  cancer-589                 Cancer (589, 44, 2)                (589, 44, 2)     .dat, .csv
+  …
+  tcga-luad-589              TCGA_LUAD (589, 57772, 2)          (589, 57772, 2)  .dat, .csv  401 MB
+Nominal/  every feature nominal · metric (auto): hamming
+  …
+Heterogeneous/  quantitative and nominal features · metric (auto): zhuravlev
+  …
+
+> erdr data info uzb-kor-100
+Uzb-Kor (100, 24, 2)  (100, 24, 2)
+  type          nominal — every feature nominal
+  classes       K1 = 1: 50 · K2 = 2: 50
+  quantitative  0: —
+  nominal       24: x₁, x₂, …, x₂₄
+  metric        hamming (auto · nominal dataset)
+  suited        zhuravlev, weighted-zhuravlev, heom, gower, hamming
+  memory        about 1 MB for a run
+  permitted k   3, 5, …, 97  (odd k from 3 to 2·min|Kᵢ| − 3 = 97)
+```
+
+`erdr data check` checks every dataset of the folder (or only the ones named): header against
+name, `.dat` against `.csv`, feature types against the type folder, the author's file conventions
+line by line; it exits with 1 when a problem is found. `erdr data info -c FILE` shows the metric
+that configuration runs on the dataset, or ⚠ why it cannot. `erdr run` warns before a run that
+needs more memory than is free (TCGA_LUAD: about 790 MB).
 
 ## erdr spheres
 

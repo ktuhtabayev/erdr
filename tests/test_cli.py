@@ -61,9 +61,12 @@ def test_data_commands():
     code, out = invoke("data", "info", "heart-disease-270")
     assert code == 0
     assert "permitted k   3, 5, …, 237" in out
-    code, out = invoke("data", "check")
+    code, out = invoke("data", "check", "default", "heart-disease-270", "uzb-kor-100")
     assert code == 0
     assert "✓ default" in out
+    assert "✓ uzb-kor-100" in out
+    assert "nominal" in out
+    assert invoke("data", "check", "nothing")[0] == 2
     assert invoke("data", "info", "nothing")[0] == 2
 
 
@@ -186,3 +189,51 @@ def test_spheres_command(tmp_path: Path):
     assert "The spheres of S₄" in out
     code, out = invoke("spheres", "-f", str(tmp_path / "all.png"))
     assert (tmp_path / "all.png").is_file()
+
+
+def test_datasets_by_type_and_their_metric(tmp_path: Path):
+    """The type folders, the metric of each type and a metric the dataset cannot take."""
+    code, out = invoke("data", "list")
+    assert code == 0
+    assert "Quantitative/  every feature quantitative · metric (auto): manhattan" in out
+    assert "Nominal/  every feature nominal · metric (auto): hamming" in out
+    assert "Heterogeneous/  quantitative and nominal features · metric (auto): zhuravlev" in out
+    assert "uzb-kor-100                nominal" in out  # the built-in copies with their type
+    code, out = invoke("data", "info", "uzb-kor-100")
+    assert code == 0
+    assert "type          nominal — every feature nominal" in out
+    assert "metric        hamming (auto · nominal dataset)" in out
+    assert "suited        zhuravlev, weighted-zhuravlev, heom, gower, hamming" in out
+    assert "memory        about" in out
+    config = tmp_path / "euclidean.yaml"
+    config.write_text("distance:\n  metric: euclidean\n", encoding="utf-8")
+    code, out = invoke("data", "info", "uzb-kor-100", "-c", str(config))
+    assert code == 0
+    assert "⚠ metric      euclidean is defined on quantitative features only" in out
+    code, out = invoke("data", "info", "heart-disease-270", "-c", str(config))
+    assert "⚠ euclidean sees only 6 quantitative feature(s)" in out
+    code, out = invoke("run", "hypertension-147", "--brief")
+    assert code == 0
+    assert "(m = 147, n = 29, quantitative)" in out
+    assert "metric manhattan (auto · quantitative dataset)" in out
+    code, out = invoke("run", "hypertension-147", "--brief", "-m", "hamming")
+    assert code == 2
+    assert "Hypertension (147, 29, 2) is a quantitative dataset without nominal features" in out
+    code, out = invoke("run", "uzb-kor-100", "--brief", "-m", "gower")
+    assert code == 0
+    assert "metric gower ·" in out
+    code, out = invoke("config", "check", str(CONFIGS / "default.yaml"))
+    assert code == 0
+    assert (
+        "metric  auto (quantitative: manhattan · nominal: hamming · heterogeneous: zhuravlev)"
+        in out
+    )
+    wrong = tmp_path / "wrong.yaml"
+    wrong.write_text("distance:\n  type_metrics:\n    heterogeneous: euclidean\n", encoding="utf-8")
+    code, out = invoke("config", "check", str(wrong))
+    assert code == 2
+    assert "does not suit heterogeneous datasets" in out
+    code, out = invoke("config", "check", str(config))
+    assert "metric  euclidean" in out
+    code, out = invoke("plugins")
+    assert "nominal              hamming (auto), zhuravlev" in out

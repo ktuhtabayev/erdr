@@ -56,6 +56,41 @@ class FeatureType(StrEnum):
         )
 
 
+class DatasetType(StrEnum):
+    """Type of a dataset, from the types of its features (ADR-021).
+
+    The three folders of ``datasets/`` — ``Quantitative/``, ``Nominal/``, ``Heterogeneous/`` —
+    and the metric that ``distance.metric: auto`` chooses (ADR-022) follow it.
+    """
+
+    QUANTITATIVE = "quantitative"
+    """Every feature is quantitative (set J is empty)."""
+    NOMINAL = "nominal"
+    """Every feature is nominal (set I is empty)."""
+    HETEROGENEOUS = "heterogeneous"
+    """Quantitative and nominal features."""
+
+    @property
+    def folder(self) -> str:
+        """``Quantitative`` — the name of the dataset folder of this type."""
+        return self.value.capitalize()
+
+    @classmethod
+    def of(cls, types: Sequence[FeatureType]) -> DatasetType:
+        """The type of a dataset whose features have ``types``."""
+        kinds = set(types)
+        if kinds == {FeatureType.QUANTITATIVE}:
+            return cls.QUANTITATIVE
+        if kinds == {FeatureType.NOMINAL}:
+            return cls.NOMINAL
+        return cls.HETEROGENEOUS
+
+    @classmethod
+    def from_folder(cls, name: str) -> DatasetType | None:
+        """The type a dataset folder stands for (``Nominal`` → nominal), else ``None``."""
+        return next((kind for kind in cls if kind.value == name.lower()), None)
+
+
 def as_labels(labels: Sequence[Label] | npt.NDArray[Any]) -> npt.NDArray[Any]:
     """Class labels as an array: int64 if all are integers, text if all are strings."""
     values = list(np.asarray(labels, dtype=object).ravel())
@@ -157,6 +192,11 @@ class Dataset:
     def type_flags(self) -> tuple[int, ...]:
         """The workbook's type row: 1 = quantitative, 0 = nominal."""
         return tuple(t.flag for t in self.feature_types)
+
+    @property
+    def dataset_type(self) -> DatasetType:
+        """Quantitative, nominal or heterogeneous — from the feature types (ADR-021)."""
+        return DatasetType.of(self.feature_types)
 
     # ------------------------------------------------------------------ classes
 

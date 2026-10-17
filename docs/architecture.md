@@ -99,10 +99,10 @@ Every exchangeable part is a plug-in chosen by name ([Extending](extending.md)):
 | Kind | Default | Built in |
 |---|---|---|
 | normalizers | min–max over E₀ | none, z-score, robust, max-abs, decimal scaling, rank, unit length |
-| metrics | Zhuravlev | weighted Zhuravlev, HEOM, Gower (any features); Manhattan, Euclidean, Chebyshev, Minkowski, Canberra, cosine, Mahalanobis (set I); Hamming (set J) |
+| metrics | by dataset type (`auto`): Zhuravlev on heterogeneous data, Manhattan on quantitative, Hamming on nominal — the Zhuravlev distances on every type | weighted Zhuravlev, HEOM, Gower (any features); Manhattan, Euclidean, Chebyshev, Minkowski, Canberra, cosine, Mahalanobis (set I); Hamming (set J) |
 | dataset formats | detected from the file | extended `.csv`/`.dat`, CSV table, Excel table, ERDR workbook, Parquet (extra `[parquet]`) |
 | export formats | all | CSV, JSON, Markdown, LaTeX, Excel, figures, HTML, datasets |
-| built-in datasets | Heart-Disease (7, 13, 2) | Heart-Disease (270, 13, 2), the guide's example (7, 4, 2) |
+| built-in datasets | Heart-Disease (7, 13, 2) | Heart-Disease (270, 13, 2), the guide's example (7, 4, 2), every dataset of the type folders except TCGA_LUAD |
 | readings | literal | A, B, C, scope of z — 16 combinations |
 
 Plug-ins register in a `Registry`; external packages add them through the entry-point group

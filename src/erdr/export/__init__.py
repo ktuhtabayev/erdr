@@ -90,13 +90,14 @@ def all_figures(run: ExperimentResult, options: ExportOptions) -> list[tuple[str
 def run_settings(run: ExperimentResult) -> list[tuple[str, str]]:
     """The settings of a run as (name, value) pairs for the report and the workbook."""
     config = run.config
-    params = config.distance.metric.params
-    metric = run.distances.metric + (f" {params}" if params else "")
+    flagged = run.metric_choice.note if run.metric_choice else ""
     return [
         ("Dataset", f"{run.dataset.name}  (m = {run.dataset.m}, n = {run.dataset.n})"),
+        ("Dataset type", run.dataset.dataset_type.value),
         ("Source", run.dataset.source or "—"),
         ("Normalizer", run.distances.scaling.normalizer),
-        ("Metric · features", f"{metric} · {config.distance.features}"),
+        ("Metric · features", f"{run.metric_label} · {config.distance.features}"),
+        *([("⚠ Metric", flagged)] if flagged else []),
         ("Distance rounding", f"{config.distance.decimals} decimals"),
         ("k · k rule", f"{run.k} · {config.erdr.k_rule} (permitted: {run.permitted.text})"),
         ("ε", repr(config.erdr.epsilon)),

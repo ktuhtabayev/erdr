@@ -64,8 +64,12 @@ Groups: `erdr.metrics`, `erdr.normalizers`, `erdr.loaders`, `erdr.exporters`
 
 ## A dataset
 
-Drop `<Name> (m, n, c).dat` (and/or `.csv`) in the extended layout into a family folder of
-`datasets/`; `erdr data check` verifies it ([Datasets](datasets.md)).
+Drop `<Name> (m, n, c).dat` and `.csv` in the extended layout into a family folder of the type
+folder that fits its features — `datasets/Quantitative/`, `Nominal/` or `Heterogeneous/`;
+`erdr data check` verifies it, including the type folder and the author's file conventions
+(`erdr.data.write_extended` writes them). The metric follows its type ([Datasets](datasets.md)).
+To build a small dataset into the package, copy its `.csv` to `src/erdr/data/datasets/` and add
+it to `erdr.data.builtin` with its type.
 
 ## A reading
 

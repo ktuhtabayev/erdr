@@ -194,7 +194,7 @@ def summary_table(run: ExperimentResult) -> Table:
     rows: list[tuple[Cell, ...]] = [
         ("Dataset", f"{run.dataset.name}  ({run.dataset.m}, {run.dataset.n}, {classes})"),
         ("Objects N · class sizes", f"{run.dataset.m} · " + " · ".join(str(s) for s in sizes)),
-        ("Normalizer · metric", f"{run.distances.scaling.normalizer} · {run.distances.metric}"),
+        ("Normalizer · metric", f"{run.distances.scaling.normalizer} · {run.metric_label}"),
         ("k for z(Sᵢ, k) · permitted by the k rule", f"{run.k}  (permitted: {run.permitted.text})"),
         ("ε", run.result.epsilon),
         ("Reading", result.readings.label + ("  (literal)" if result.readings.is_literal else "")),

@@ -87,7 +87,9 @@ counter changes as `S₁: 3 → 2` — the workbook's own wording, so the valida
 *Accepted, 2026-10-11.*
 
 - The existing `datasets/Heart-Disease/Heart-Disease (270, 13, 2).csv|.dat` are kept as they are
-  (family folder directly under `datasets/`, no `raw/` level).
+  (family folder directly under `datasets/`, no `raw/` level). *Amended by ADR-021:* the author
+  moved them, unchanged, to `datasets/Heterogeneous/Heart-Disease/`; the datasets are grouped by
+  type folder.
 - `datasets/default.csv` and `default.dat` = Heart-Disease (7, 13, 2): rows 1, 10, 73, 143, 224,
   226, 239 of the 270-object files, copied byte for byte (only the first row becomes `7,13,2` /
   `7 13 2`) — identical to the workbook's *Dataset* sheet (tested).
@@ -342,5 +344,93 @@ the new visuals follow the same style and formats.
   across runs. 0.4.0 also let the Results page delete the pages of an earlier run; 0.4.1 detaches
   them again as before (it clears its tabs before the loop that would delete them — unlike what
   ADR-018 says), the behaviour every earlier release ran with.
+
+No numerical result changes.
+
+## ADR-021 — Datasets by type: Quantitative, Nominal, Heterogeneous (author)
+
+*Accepted, 2026-10-17.*
+
+**Author.** Categorized datasets were added to `datasets/` — the folders `Quantitative/`,
+`Nominal/` and `Heterogeneous/` — to be integrated throughout the project following the rules of
+each dataset type; a dataset that does not match the default structure is reported first.
+
+- **The review.** Every file was checked against the extended layout and the author's
+  conventions (ADR-007). All of them loaded, with headers equal to their names and `.dat` equal to
+  `.csv`. What did not match was reported, and the author decided:
+  - every new `.dat` file had Windows line ends and integers without a decimal point → **rewritten
+    in the conventions of `default.dat`** (LF, `70.0`), the data checked against the `.csv`
+    (the 391 MB TCGA_LUAD file streamed and compared row by row);
+  - Ionosfera (350, 33, 2) and DDoS (10000, 80, 2) were in `Quantitative/` with one nominal
+    feature → Ionosfera **moved to `Heterogeneous/`**, the DDoS files **deleted** (both versions;
+    the 22-feature one held 380 distinct rows in 10,000, the 80-feature one 13 constant columns);
+  - Spambase (4595, 57, 2) had the class labels 0/1 and 391 repeated rows → **deleted**; Spambase
+    (4204, 57, 2) is exactly that file without the repeats, labels 1/2 (verified);
+  - TCGA_LUAD (589, 57772, 2) is 391 MB per file, over GitHub's 100 MB → **kept on the author's
+    computer only**: its `.dat`/`.csv` are in `.gitignore`, its `ReadMe.txt` (how to download it)
+    is in Git; erdr catalogues and runs it when present.
+- **The rule of the type folders.** A dataset's type comes from its feature flags
+  (`DatasetType`: quantitative = every flag 1, nominal = every flag 0, heterogeneous = both), and
+  the folder must agree: `erdr data check` reports a nominal feature in `Quantitative/`, a
+  quantitative one in `Nominal/`, a single-type dataset in `Heterogeneous/`. The catalogue reads
+  `<Type>/<Family>/<Name (m, n, c)>.dat|.csv`; a family folder directly under `datasets/` is still
+  read (*Other*). Heart-Disease (270, 13, 2) moved to `Heterogeneous/Heart-Disease/` — byte for
+  byte the same files (amends ADR-007).
+- **The conventions are checked.** `erdr data check` compares every file line by line with what
+  `write_extended` writes for its data and names the first line that departs (streamed, so a file
+  of any size). The writer now writes numbers without an exponent (`0.00003` as Ionosfera's
+  `.csv` does, not `3e-05`); Heart-Disease and the default dataset are written as before, byte for
+  byte. A test reads and rewrites every file of the folder (except the local-only one).
+- **Large files.** The extended-layout loader parses each row as it reads it, so TCGA_LUAD (34
+  million values) never holds all its cells as text; a run on it needs about 790 MB and takes
+  162 s on the development laptop (7.7 GB). `erdr data info`, `erdr run` and the GUI estimate the
+  memory of a run (8·(3·m·n + 4·m²) bytes, calibrated on German and Spambase) and warn when it is
+  more than the free memory. `erdr data check DATASET…` checks only the named datasets.
+- **Built-in.** The package carries byte-for-byte copies of the `.csv` files of every dataset of
+  the folder except TCGA_LUAD (1.3 MB), with their type, so the Windows executable has them; the
+  GUI and `erdr data list` group them by type. A test keeps the copies equal to the folder.
+- **Everywhere.** `erdr data list` groups the catalogue by type folder (with each type's rule and
+  metric), `erdr data info` names the type, the metric and the metrics that suit, `erdr run`
+  prints the type in its header; the GUI's chooser lists the type folders as headings, the summary
+  shows the type in the colour of its features (heterogeneous: the type-row colour — no new
+  colour), the exports name the dataset type in their settings.
+- **Public repository.** The repository is public (ADR-014): Uzb-Kor (a questionnaire of the
+  NUUz sociology department), Hypertension (from N. A. Ignatev's monograph) and Cancer (source not
+  recorded) become public when pushed, and are built into released executables.
+
+No numerical result of an existing dataset changes; `erdr validate` passes unchanged (2,927).
+
+## ADR-022 — The metric follows the dataset type (author)
+
+*Accepted, 2026-10-17.*
+
+**Author.** «Choose metrics based on dataset types.»
+
+- **Suitability.** A metric declares its domain (ADR-010). On a quantitative dataset the
+  quantitative and the heterogeneous metrics suit, on a nominal one Hamming and the heterogeneous
+  metrics, on a heterogeneous one the heterogeneous metrics (Zhuravlev, weighted Zhuravlev, HEOM,
+  Gower). A metric not defined on the dataset's features — Euclidean on Uzb-Kor, Hamming on
+  Cancer — is a `ConfigError` that lists the metrics that suit (before: «the feature selection
+  is empty»). A single-type metric on a heterogeneous dataset still runs on its part of the
+  features, as before, but is **flagged ⚠** (run warnings, the settings of every export, the
+  CLI, the GUI): it ignores the other feature type.
+- **`distance.metric: auto` (the default).** The metric is taken from `distance.type_metrics`
+  by the dataset's type: quantitative → `manhattan`, nominal → `hamming`, heterogeneous →
+  `zhuravlev`. These are the Zhuravlev metric and its two parts ρ_I = Σ_I |x′ − y′| and
+  ρ_J = Σ_J [x ≠ y]: on single-type data they give **the Zhuravlev distances bit for bit** (same
+  summation order, same rounding) — tested on every dataset type — so the literal default of
+  CLAUDE.md and ADR-002 is kept on every dataset, and `erdr validate` passes unchanged. A metric of
+  `type_metrics` must suit its type (checked by `erdr config check` and before a run); it may carry
+  parameters (`minkowski {p: 3}`). Choosing, say, Euclidean for quantitative datasets changes
+  numerical results — the author's choice, made in the configuration or the GUI.
+- **Shown everywhere.** Runs record the metric chosen (`ExperimentResult.metric_choice`); the
+  exports and the CLI write it as `manhattan (auto · quantitative dataset)`. The shipped
+  configurations name `metric: auto` with the `type_metrics` block. The GUI's metric box starts
+  with *auto — the metric of the dataset type*; under it one box per type offers the metrics that
+  suit that type; metrics not defined on the loaded dataset are disabled with the reason as
+  tooltip, and a single-type metric on heterogeneous data shows the ⚠ box.
+- The ρ_I / ρ_J tables of the *Zhuravlev Distances* sheet are written when the metric is
+  Zhuravlev, as before; on single-type data `auto` runs Manhattan or Hamming, whose matrix is the
+  *Distances* sheet.
 
 No numerical result changes.

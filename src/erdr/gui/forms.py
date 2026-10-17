@@ -51,12 +51,16 @@ class ParamsForm(QWidget):
         self._editors: dict[str, QWidget] = {}
         self._defaults: dict[str, Any] = {}
 
-    def set_plugin(self, registry: Registry[Any], name: str, values: dict[str, Any]) -> None:
-        """Show the parameters of plug-in ``name`` with ``values`` (defaults for the rest)."""
+    def clear(self) -> None:
+        """Show no parameters (the metric ``auto`` has none of its own)."""
         while self._layout.rowCount():
             self._layout.removeRow(0)
         self._editors.clear()
         self._defaults.clear()
+
+    def set_plugin(self, registry: Registry[Any], name: str, values: dict[str, Any]) -> None:
+        """Show the parameters of plug-in ``name`` with ``values`` (defaults for the rest)."""
+        self.clear()
         params_type = registry.info(name).params_type
         if params_type is None:
             return

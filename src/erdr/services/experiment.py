@@ -1,8 +1,10 @@
 """The experiment runner: a configuration and a dataset in, an :class:`ExperimentResult` out.
 
-It resolves the plug-ins of the configuration, checks the k rule (ADR-005), runs Step 0 and ERDR,
+It resolves the plug-ins of the configuration — the metric from the dataset type when
+``distance.metric`` is ``auto`` (ADR-022) —, checks the k rule (ADR-005), runs Step 0 and ERDR,
 detects the cases, and records everything a run folder, an export or the GUI needs: the
-configuration and its hash, the dataset and its content hash, timings and warnings.
+configuration and its hash, the metric chosen, the dataset and its content hash, timings and
+warnings.
 """
 
 from __future__ import annotations
@@ -20,12 +22,13 @@ from erdr.config.models import ExperimentConfig
 from erdr.config.presets import reading_notes
 from erdr.core.algorithm import ERDRResult, run_erdr
 from erdr.core.cases import CaseResult, detect_cases
-from erdr.core.distances import Distances, FeatureSelection, compute_distances
+from erdr.core.distances import Distances, compute_distances
 from erdr.core.k_rule import PermittedK, permitted_k
 from erdr.data.loaders import load_from_config
 from erdr.data.schema import Dataset
 from erdr.data.writers import shape_name
 from erdr.errors import ConfigError
+from erdr.services.datasets import MetricChoice, choose_metric, feature_selection
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +58,15 @@ class ExperimentResult:
     seconds: float
     """Wall-clock duration of Step 0 to Step 6."""
     warnings: tuple[str, ...] = field(default_factory=tuple)
-    """Warnings raised while running (k outside the rule with ``k_rule: warn``, …)."""
+    """Warnings raised while running (k outside the rule with ``k_rule: warn``, a metric that
+    sees one feature type of a heterogeneous dataset, …)."""
+    metric_choice: MetricChoice | None = None
+    """The metric that was run and why (``auto``: the metric of the dataset type)."""
+
+    @property
+    def metric_label(self) -> str:
+        """``zhuravlev (auto · heterogeneous dataset)`` — the metric as the exports show it."""
+        return self.metric_choice.label if self.metric_choice else self.distances.metric
 
     @property
     def k(self) -> int:
@@ -92,19 +103,6 @@ class ExperimentResult:
         return tuple(int(c) for c in np.bincount(classes, minlength=len(self.dataset.classes)))
 
 
-def _feature_indices(config: ExperimentConfig, dataset: Dataset) -> FeatureSelection:
-    features = config.distance.features
-    if isinstance(features, str):
-        return features
-    unknown = [name for name in features if name not in dataset.feature_names]
-    if unknown:
-        raise ConfigError(
-            f"distance.features names unknown features {unknown} "
-            f"(the dataset has {', '.join(dataset.feature_names)})"
-        )
-    return [dataset.feature_names.index(name) for name in features]
-
-
 def check_k_rule(config: ExperimentConfig, dataset: Dataset) -> tuple[PermittedK, tuple[str, ...]]:
     """The permitted k of ``dataset`` and the warnings of the k rule (ADR-005).
 
@@ -126,20 +124,29 @@ def check_k_rule(config: ExperimentConfig, dataset: Dataset) -> tuple[PermittedK
     return permitted, (message,)
 
 
-def step0(config: ExperimentConfig, dataset: Dataset) -> Distances:
+def step0(
+    config: ExperimentConfig, dataset: Dataset, choice: MetricChoice | None = None
+) -> Distances:
     """Step 0 as configured: scale unification and the distance matrix of ``dataset``.
 
+    Args:
+        config: The configuration.
+        dataset: The sample E₀.
+        choice: The metric chosen for ``dataset`` (:func:`choose_metric` when omitted).
+
     Raises:
-        ConfigError: Invalid plug-ins, parameters or feature selection.
+        ConfigError: Invalid plug-ins or parameters, a metric not defined on the dataset's
+            feature types, or an invalid feature selection.
     """
+    metric = choice or choose_metric(config, dataset)
     return compute_distances(
         dataset.X,
         dataset.quantitative,
         normalizer=config.preprocessing.normalizer.name,
         normalizer_params=config.preprocessing.normalizer.params,
-        metric=config.distance.metric.name,
-        metric_params=config.distance.metric.params,
-        features=_feature_indices(config, dataset),
+        metric=metric.name,
+        metric_params=metric.spec.params,
+        features=feature_selection(config, dataset),
         decimals=config.distance.decimals,
         names=dataset.feature_names,
     )
@@ -168,7 +175,11 @@ def run_experiment(
     started = datetime.now(UTC)
     clock = time.perf_counter()
     permitted, warnings = check_k_rule(chosen, data)
-    distances = step0(chosen, data)
+    choice = choose_metric(chosen, data)
+    if choice.note:
+        logger.warning(choice.note)
+        warnings = (*warnings, choice.note)
+    distances = step0(chosen, data, choice)
     result = run_erdr(
         distances.matrix,
         data.class_index,
@@ -195,4 +206,5 @@ def run_experiment(
         started=started,
         seconds=seconds,
         warnings=warnings,
+        metric_choice=choice,
     )

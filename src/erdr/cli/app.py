@@ -40,8 +40,8 @@ from erdr.config import (
 from erdr.core.metrics import METRICS, traits_of
 from erdr.core.normalizers import NORMALIZERS
 from erdr.core.readings import CLOSEST, LITERAL, Readings, ZScope
-from erdr.data import DATASETS, LOADERS, Dataset, load_from_config
-from erdr.data.catalog import project_catalog, resolve_dataset
+from erdr.data import DATASETS, LOADERS, Dataset, DatasetType, load_from_config
+from erdr.data.catalog import check_entry, project_catalog, resolve_dataset
 from erdr.errors import ConfigError, ERDRError
 from erdr.export import EXPORTERS, ExportOptions, export_result, resolve_formats
 from erdr.export.figures import (
@@ -72,7 +72,14 @@ from erdr.gui import GUI_EXTRA_HINT
 from erdr.log import configure_logging
 from erdr.notation import object_order, object_set
 from erdr.services.analysis import compare_readings, sweep_k
-from erdr.services.datasets import summarize
+from erdr.services.datasets import (
+    check_type_metrics,
+    is_auto,
+    megabytes,
+    memory_warning,
+    suited_metrics,
+    summarize,
+)
 from erdr.services.experiment import ExperimentResult, run_experiment
 from erdr.services.runs import RunError, latest_run, list_runs, load_run, save_run
 from erdr.services.validation import DEFAULT_TOLERANCE, find_workbook, validate_workbook
@@ -92,8 +99,17 @@ config_app = typer.Typer(
     help="Create, show and check experiment configurations.", no_args_is_help=True
 )
 data_app = typer.Typer(
-    help="Inspect datasets: sizes, feature types, classes, permitted k.", no_args_is_help=True
+    help="Inspect datasets: sizes, dataset type, metrics, classes, permitted k.",
+    no_args_is_help=True,
 )
+LARGE_FILE = 50 * 2**20
+"""Dataset files above this size show their size in ``erdr data list``."""
+TYPE_RULES = {
+    DatasetType.QUANTITATIVE: "every feature quantitative",
+    DatasetType.NOMINAL: "every feature nominal",
+    DatasetType.HETEROGENEOUS: "quantitative and nominal features",
+}
+"""The rule of each dataset type (ADR-021)."""
 app.add_typer(config_app, name="config")
 app.add_typer(data_app, name="data")
 
@@ -220,16 +236,31 @@ def config_check(
         NORMALIZERS.make_params(
             config.preprocessing.normalizer.name, config.preprocessing.normalizer.params
         )
-        METRICS.make_params(config.distance.metric.name, config.distance.metric.params)
+        if is_auto(config.distance.metric):
+            check_type_metrics(config)
+        else:
+            METRICS.make_params(config.distance.metric.name, config.distance.metric.params)
     except ERDRError as error:
         raise _fail(error) from error
     chosen = matching_preset(config)
     typer.echo(f"{path}: valid")
     typer.echo(f"  hash    {config_hash(config)}")
     typer.echo(f"  preset  {chosen.value if chosen else 'custom'}")
+    typer.echo(f"  metric  {_metric_text(config)}")
     typer.echo(f"  reading {config.erdr.readings.to_readings().label}")
     for note in reading_notes(config):
         typer.echo(paint(f"  ⚠ {note.switch}: {note.statement}", "warning"))
+
+
+def _metric_text(config: ExperimentConfig) -> str:
+    """``auto (quantitative: manhattan · nominal: hamming · heterogeneous: zhuravlev)``."""
+    if not is_auto(config.distance.metric):
+        return config.distance.metric.name
+    by_type = " · ".join(
+        f"{kind.value}: {config.distance.type_metrics.for_type(kind.value).name}"
+        for kind in DatasetType
+    )
+    return f"auto ({by_type})"
 
 
 def _config(path: Path | None) -> tuple[ExperimentConfig, Path | None]:
@@ -245,31 +276,64 @@ def _config(path: Path | None) -> tuple[ExperimentConfig, Path | None]:
 def data_list() -> None:
     """List the datasets of the project's folder, the built-in datasets and the file formats."""
     catalog = project_catalog()
+    metrics = ExperimentConfig().distance.type_metrics
     if catalog is not None:
         typer.echo(f"datasets folder: {catalog.root}")
-        for entry in catalog:
-            shape = "({}, {}, {})".format(*entry.shape) if entry.shape else "?"
-            typer.echo(f"  {entry.id:24s} {entry.name:32s} {shape:14s} {', '.join(entry.formats)}")
+        for title, entries in catalog.groups():
+            folder = DatasetType.from_folder(title)
+            if folder is not None:
+                rule = (
+                    f"{TYPE_RULES[folder]} · metric (auto): {metrics.for_type(folder.value).name}"
+                )
+                typer.echo(f"{paint(title + '/', 'parameter', bold=True)}  {rule}")
+            elif title != "default":
+                typer.echo(f"{title}:")
+            for entry in entries:
+                shape = "({}, {}, {})".format(*entry.shape) if entry.shape else "?"
+                size = f"  {megabytes(entry.size)}" if entry.size > LARGE_FILE else ""
+                typer.echo(
+                    f"  {entry.id:26s} {entry.name:34s} {shape:16s} "
+                    f"{', '.join(entry.formats)}{size}"
+                )
     else:
         typer.echo("no datasets folder (set ERDR_DATASETS or work inside the project)")
     typer.echo("built-in datasets:")
     for info in DATASETS:
-        typer.echo(f"  {info.name:24s} {info.summary}")
+        kind = info.obj.dataset_type.value
+        typer.echo(f"  {info.name:26s} {kind:14s} {info.summary}")
     typer.echo("file formats: " + ", ".join(LOADERS.names()))
 
 
 @data_app.command("check")
-def data_check() -> None:
-    """Load every file of the datasets folder; compare headers, names and formats."""
+def data_check(
+    ids: Annotated[
+        list[str] | None,
+        typer.Argument(help="Datasets to check, by id or name (default: every one)."),
+    ] = None,
+) -> None:
+    """Load every file of the datasets folder and check it.
+
+    Headers against names, ``.dat`` against ``.csv``, feature types against the type folder,
+    and the author's file conventions.
+    """
     catalog = project_catalog()
     if catalog is None:
         typer.echo("error: no datasets folder", err=True)
         raise typer.Exit(EXIT_USAGE)
+    entries = list(catalog)
+    if ids:
+        found = {key: catalog.find(key) for key in ids}
+        unknown = [key for key, entry in found.items() if entry is None]
+        if unknown:
+            typer.echo(f"error: unknown dataset(s) {', '.join(unknown)}", err=True)
+            raise typer.Exit(EXIT_USAGE)
+        entries = [entry for entry in found.values() if entry is not None]
     failed = False
-    for check in catalog.check():
+    for check in (check_entry(entry) for entry in entries):
         mark = "✓" if check.passed else "✗"
         digest = check.content_hash[:12] if check.content_hash else "—"
-        typer.echo(f"{mark} {check.entry.id:24s} {check.shape}  {digest}")
+        kind = check.dataset_type.value if check.dataset_type else "—"
+        typer.echo(f"{mark} {check.entry.id:26s} {check.shape}  {kind:14s} {digest}")
         for ext, digest in check.sha256.items():
             typer.echo(f"    {ext}  sha256 {digest}")
         for problem in check.problems:
@@ -287,20 +351,33 @@ def _dataset(source: str | None, config: ExperimentConfig, base: Path | None) ->
 
 
 @data_app.command("info")
-def data_info(source: DatasetArgument = None) -> None:
-    """Sizes, feature types, classes and the permitted k of a dataset."""
+def data_info(source: DatasetArgument = None, config_path: ConfigOption = None) -> None:
+    """Sizes, dataset type and its metrics, feature types, classes and the permitted k."""
     try:
-        dataset = resolve_dataset(source)
+        config, base = _config(config_path)
+        dataset = _dataset(source, config, base)
     except ERDRError as error:
         raise _fail(error) from error
-    s = summarize(dataset)
+    s = summarize(dataset, config)
     typer.echo(f"{s.name}  {s.shape}")
     typer.echo(f"  source        {s.source or '—'}")
+    typer.echo(f"  type          {s.dataset_type.value} — {TYPE_RULES[s.dataset_type]}")
     typer.echo(f"  classes       {s.class_text}")
     quantitative = paint(f"quantitative  {len(s.quantitative)}", "quantitative", bold=True)
     nominal = paint(f"nominal       {len(s.nominal)}", "nominal", bold=True)
-    typer.echo(f"  {quantitative}: {', '.join(s.quantitative) or '—'}")
-    typer.echo(f"  {nominal}: {', '.join(s.nominal) or '—'}")
+    typer.echo(f"  {quantitative}: {_names(s.quantitative)}")
+    typer.echo(f"  {nominal}: {_names(s.nominal)}")
+    if s.metric is not None:
+        typer.echo(f"  metric        {s.metric.label}")
+        if s.metric.note:
+            typer.echo(paint(f"  ⚠ {s.metric.note}", "warning"))
+    else:
+        typer.echo(paint(f"  ⚠ metric      {s.metric_problem}", "warning"))
+    typer.echo(f"  suited        {', '.join(s.metrics)}")
+    typer.echo(f"  memory        about {megabytes(s.memory)} for a run")
+    warning = memory_warning(s.m, s.n)
+    if warning:
+        typer.echo(paint(f"  ⚠ {warning}", "warning"))
     typer.echo(
         f"  permitted k   {s.permitted.text}  (odd k from 3 to 2·min|Kᵢ| − 3 = {s.permitted.k_max})"
     )
@@ -309,6 +386,14 @@ def data_info(source: DatasetArgument = None) -> None:
         f"k ≤ {s.largest_k_own_class} (own class)"
     )
     typer.echo(f"  content hash  {s.content_hash}")
+
+
+def _names(names: Sequence[str], limit: int = 30) -> str:
+    """Feature names, the first ``limit`` of a long list then ``… (+ k more)``."""
+    if not names:
+        return "—"
+    shown = ", ".join(names[:limit])
+    return shown + (f", … (+ {len(names) - limit} more)" if len(names) > limit else "")
 
 
 # ---------------------------------------------------------------- erdr plugins
@@ -332,6 +417,13 @@ def plugins() -> None:
                 extra = f"  [{domain}]" if domain != "any" else ""
             aliases = f"  (also: {', '.join(info.aliases)})" if info.aliases else ""
             typer.echo(f"  {info.name:20s} {info.summary}{extra}{aliases}")
+        if registry is METRICS:
+            typer.echo("metrics by dataset type (ADR-022; 'auto' takes the first):")
+            metrics = ExperimentConfig().distance.type_metrics
+            for kind in DatasetType:
+                chosen = metrics.for_type(kind.value).name
+                others = [name for name in suited_metrics(kind) if name != chosen]
+                typer.echo(f"  {kind.value:20s} {chosen} (auto), {', '.join(others)}")
 
 
 # ---------------------------------------------------------------- erdr run
@@ -402,11 +494,11 @@ def _echo_header(run: ExperimentResult) -> None:
     """The dataset, the settings and a ⚠ line for every reading that is not the literal one."""
     result = run.result
     typer.echo(
-        f"{run.dataset.name}  (m = {run.dataset.m}, n = {run.dataset.n})  ·  k = {run.k}  ·  "
-        f"{result.readings.label}"
+        f"{run.dataset.name}  (m = {run.dataset.m}, n = {run.dataset.n}, "
+        f"{run.dataset.dataset_type.value})  ·  k = {run.k}  ·  {result.readings.label}"
     )
     typer.echo(
-        f"normalizer {run.distances.scaling.normalizer} · metric {run.distances.metric} · "
+        f"normalizer {run.distances.scaling.normalizer} · metric {run.metric_label} · "
         f"ε = {result.epsilon}"
     )
     for note in run.notes:
@@ -491,7 +583,11 @@ def run(
             normalizer=normalizer,
             k_rule=k_rule,
         )
-        experiment = run_experiment(config, _dataset(source, config, base))
+        dataset = _dataset(source, config, base)
+        warning = memory_warning(dataset.m, dataset.n)
+        if warning:
+            typer.echo(paint(f"⚠ {warning}", "warning"))
+        experiment = run_experiment(config, dataset)
         _print_run(experiment, show_all=show_all, trace=trace)
         folder = save_run(experiment, runs_dir) if save else None
         if folder is not None:

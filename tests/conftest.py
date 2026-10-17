@@ -17,8 +17,17 @@ DATASETS = ROOT / "datasets"
 CONFIGS = ROOT / "configs"
 WORKBOOK = ROOT / "resources" / "Experiments" / "ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx"
 """The ERDR workbook: the specification and its golden values."""
-HEART_270 = DATASETS / "Heart-Disease" / "Heart-Disease (270, 13, 2)"
+HEART_270 = DATASETS / "Heterogeneous" / "Heart-Disease" / "Heart-Disease (270, 13, 2)"
 """Stem of the full Heart-Disease files (.csv and .dat)."""
+LOCAL_ONLY = 50 * 2**20
+"""Dataset files above this size stay on the author's computer (TCGA_LUAD, 391 MB; ADR-021):
+the tests leave them out, so they behave the same with and without them."""
+FOLDER_FILES = sorted(
+    path
+    for path in DATASETS.rglob("*")
+    if path.suffix in (".csv", ".dat") and path.stat().st_size <= LOCAL_ONLY
+)
+"""Every dataset file of the folder that is kept in Git."""
 SELECTED_ROWS = (1, 10, 73, 143, 224, 226, 239)
 """The source rows of the workbook's 7 objects S₁ … S₇."""
 

@@ -8,6 +8,7 @@ from pytestqt.qtbot import QtBot
 
 from erdr.core.metrics import METRICS
 from erdr.core.readings import BlockedCover, ZScope
+from erdr.data import DatasetType
 from erdr.export.tables import run_tables
 from erdr.gui.app import create_window, self_test
 from erdr.gui.forms import ParamsForm
@@ -25,7 +26,7 @@ pytestmark = pytest.mark.gui
 
 def test_dataset_page(window: MainWindow, messages: list[str]):
     assert window.state.dataset is None
-    assert window.dataset_page.chooser.count() >= 5  # 2 folder datasets + 3 built-in
+    assert window.dataset_page.chooser.count() >= 20  # folder + built-in datasets, by type
     assert window.dataset_page.load("heart-disease-270")
     assert window.state.dataset is not None
     assert window.state.dataset.m == 270
@@ -60,7 +61,7 @@ def test_configure_page_edits_the_state(loaded: MainWindow):
     assert loaded.state.config.distance.metric.name == "minkowski"
     page.reset_button.click()
     assert loaded.state.config.erdr.k == 3
-    assert loaded.state.config.distance.metric.name == "zhuravlev"
+    assert loaded.state.config.distance.metric.name == "auto"
 
 
 def test_configure_page_files(loaded: MainWindow, tmp_path: Path, messages: list[str]):
@@ -385,3 +386,49 @@ def test_hypersphere_explorer(loaded: MainWindow, run: Run, qtbot: QtBot):
     loaded.state.set_result(None)
     assert explorer.result is None
     assert "Run ERDR" in explorer.summary.text()
+
+
+def test_datasets_by_type_and_the_metric_that_follows(window: MainWindow):
+    """The chooser lists the type folders; the metric follows the type; unsuited ones are off."""
+    from PySide6.QtGui import QStandardItemModel
+
+    chooser = window.dataset_page.chooser
+    texts = [chooser.itemText(i) for i in range(chooser.count())]
+    for heading in ("Quantitative/", "Nominal/", "Heterogeneous/", "Built-in · Nominal"):
+        assert heading in texts
+    model = chooser.model()
+    assert isinstance(model, QStandardItemModel)
+    assert not model.item(texts.index("Nominal/")).isEnabled()  # a heading cannot be chosen
+    configure = window.configure_page
+    assert configure.metric_box.currentData() == "auto"
+    assert window.dataset_page.load("uzb-kor-100")
+    summary = window.dataset_page.summary.text()
+    assert "nominal dataset" in summary
+    assert "metric: hamming (auto · nominal dataset)" in summary
+    assert "hamming (auto · nominal dataset)" in window.run_page.context.text()
+    assert "is a nominal dataset → hamming" in configure.metric_note.text()
+    metric_model = configure.metric_box.model()
+    assert isinstance(metric_model, QStandardItemModel)
+    euclidean = configure.metric_box.findData("euclidean")
+    assert not metric_model.item(euclidean).isEnabled()
+    assert "no quantitative features" in metric_model.item(euclidean).toolTip()
+    assert metric_model.item(configure.metric_box.findData("gower")).isEnabled()
+    # auto · nominal → gower: the metric of the type changes, the configuration keeps it
+    nominal_box = configure.type_metric_boxes[DatasetType.NOMINAL]
+    nominal_box.setCurrentIndex(nominal_box.findData("gower"))
+    assert window.state.config.distance.type_metrics.nominal.name == "gower"
+    assert "metric: gower (auto · nominal dataset)" in window.dataset_page.summary.text()
+    # an explicit metric hides the metrics of the types; one the dataset lacks is flagged
+    configure.metric_box.setCurrentIndex(euclidean)
+    assert window.state.config.distance.metric.name == "euclidean"
+    assert not configure.form0.isRowVisible(nominal_box)
+    assert "nominal dataset without quantitative features" in configure.warning.text()
+    assert "⚠" in window.run_page.context.text()
+    assert window.dataset_page.load("heart-disease-270")
+    assert metric_model.item(euclidean).isEnabled()
+    assert "sees only the quantitative features" in metric_model.item(euclidean).toolTip()
+    assert "sees only 6 quantitative feature(s)" in configure.warning.text()
+    configure.metric_box.setCurrentIndex(configure.metric_box.findData("auto"))
+    assert configure.form0.isRowVisible(nominal_box)
+    assert configure.warning.isHidden()
+    assert "type_metrics" not in configure.metric_note.text()

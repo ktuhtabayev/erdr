@@ -23,10 +23,12 @@ from PySide6.QtWidgets import (
 
 from erdr.config.models import ExperimentConfig
 from erdr.data.schema import Dataset
+from erdr.errors import ERDRError
 from erdr.gui.state import AppState
 from erdr.gui.widgets import LogBridge, Page, chip
 from erdr.gui.workers import TaskRunner
 from erdr.notation import object_set
+from erdr.services.datasets import choose_metric, memory_warning
 from erdr.services.experiment import ExperimentResult, run_experiment
 from erdr.services.runs import save_run
 
@@ -98,17 +100,30 @@ class RunPage(Page):
         config = self.state.config
         reading = config.erdr.readings.to_readings()
         name = dataset.name if dataset else "no dataset loaded"
+        metric, warnings = config.distance.metric.name, []
+        if dataset is not None:
+            try:
+                choice = choose_metric(config, dataset)
+                metric = choice.label
+                warnings += [choice.note] if choice.note else []
+            except ERDRError as error:
+                warnings.append(str(error))
+            memory = memory_warning(dataset.m, dataset.n)
+            warnings += [memory] if memory else []
         parameters = " ".join(
             chip(text, "parameter")
             for text in (
                 f"k = {config.erdr.k}",
                 config.preprocessing.normalizer.name,
-                config.distance.metric.name,
+                metric,
                 f"ε = {config.erdr.epsilon:g}",
             )
         )
         flag = "literal" if reading.is_literal else "warning"
-        self.context.setText(f"<b>{name}</b> &nbsp; {parameters} {chip(reading.label, flag)}")
+        flagged = "".join(f"<br>{chip(f'⚠ {text}', 'warning', bold=False)}" for text in warnings)
+        self.context.setText(
+            f"<b>{name}</b> &nbsp; {parameters} {chip(reading.label, flag)}{flagged}"
+        )
         self.start_button.setEnabled(dataset is not None and not self.tasks.busy())
 
     def is_running(self) -> bool:

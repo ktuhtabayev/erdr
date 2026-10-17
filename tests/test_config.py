@@ -28,7 +28,10 @@ from tests.conftest import CONFIGS
 def test_defaults_are_the_workbook_settings():
     config = ExperimentConfig()
     assert config.preprocessing.normalizer.name == "minmax"
-    assert config.distance.metric.name == "zhuravlev"
+    assert config.distance.metric.name == "auto"  # Zhuravlev on heterogeneous data (ADR-022)
+    assert config.distance.type_metrics.for_type("heterogeneous").name == "zhuravlev"
+    assert config.distance.type_metrics.for_type("quantitative").name == "manhattan"
+    assert config.distance.type_metrics.for_type("nominal").name == "hamming"
     assert config.distance.decimals == 10
     assert config.erdr.k == 3
     assert config.erdr.epsilon == 0.001
