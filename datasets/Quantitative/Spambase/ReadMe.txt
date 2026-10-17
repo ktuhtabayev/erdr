@@ -1,16 +1,19 @@
 # created_date:  16.10.2026
-# updated_date:  16.10.2026
+# updated_date:  17.10.2026
 
 Fayllar:
-	Spambase (4595, 57, 2) - asosiy versiya.
-	Spambase (4204, 57, 2) - (4595, 57, 2) dan takrorlanuvchi qatorlar o'chirilgan versiya.
+	Spambase (4204, 57, 2) - UCI faylining (4595 ta obyekt) takrorlanuvchi qatorlari
+	                         o'chirilgan versiyasi.
+	(4595, 57, 2) versiyasi 17.10.2026 da o'chirildi (sinf belgilari 0/1, 391 ta takror qator).
 
-Obyektlar soni – 4595 ta / 4204 ta.
+Obyektlar soni – 4204 ta.
 
 Alomatlar soni – 57 ta (sinf ustuni bu songa kirmaydi).
 
 !!! 1-satr harakteristik vektor.
 !!! Oxirgi satr alomat turlarini ko'rsatadi: 0 - nominal, 1 - miqdoriy.
+!!! 17.10.2026: .dat fayl default.dat formatiga o'tkazildi (LF qator oxiri, qiymatlar
+!!! o'nli kasr ko'rinishida: 4 -> 4.0); qiymatlar o'zgarmagan, .csv bilan tekshirilgan.
 
 #######################################################
 
@@ -29,12 +32,16 @@ Alomatlar hususiyatlari:
 Maqsadli alomat (Target):
 
 58 - nominal.	Sinf:
-		(4595, 57, 2): 0 - spam emas (2785 ta), 1 - spam (1810 ta);
-		(4204, 57, 2): 1 - spam emas (2528 ta), 2 - spam (1676 ta).
+		1 - spam emas (2528 ta), 2 - spam (1676 ta).
 
 #######################################################
 
-Eslatmalar (16.10.2026, qiymatlar o'zgartirilmagan):
+Eslatmalar (17.10.2026):
+
+!!! (4204, 57, 2) = (4595, 57, 2) ning har bir qatori birinchi uchraganida olingan,
+!!!                tartibi saqlangan; sinflar 0/1 -> 1/2 (tekshirildi).
+
+Eslatmalar (16.10.2026, asl (4595, 57, 2) fayl haqida, qiymatlar o'zgartirilmagan):
 
 !!! (4595, 57, 2): sinf belgilari 0/1 (boshqa datasetlardagi 1..C emas).
 !!! (4595, 57, 2): 391 ta takror qator.

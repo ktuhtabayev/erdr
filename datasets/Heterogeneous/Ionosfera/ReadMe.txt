@@ -1,11 +1,15 @@
 # created_date:  05.03.2026
-# updated_date:  05.03.2026
+# updated_date:  17.10.2026
 
 Obyektlar soni - 350 ta.
 
 Alomatlar soni - 33 ta.
 
 !!! 1-satr xarakteristik vektor: (350, 33, 2).
+!!! 17.10.2026: Quantitative papkasidan Heterogeneous (aralash) papkasiga ko'chirildi,
+!!! chunki 1-alomat nominal.
+!!! 17.10.2026: .dat fayl default.dat formatiga o'tkazildi (LF qator oxiri, qiymatlar
+!!! o'nli kasr ko'rinishida: 4 -> 4.0); qiymatlar o'zgarmagan, .csv bilan tekshirilgan.
 
 Takrorlanuvchi qatorlari va o'zgarmagan ustunlari o'chirilgan.
 

@@ -5,6 +5,8 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-17 — datasets by type
+
 ### Added
 
 - The datasets folder by type (ADR-021): `datasets/Quantitative/` (Cancer (589, 44, 2),
@@ -44,6 +46,8 @@ and [Semantic Versioning](https://semver.org/).
 - The shipped configurations say `metric: auto` with the `type_metrics` block (the same results).
 - TCGA_LUAD's data files are kept out of Git (391 MB per file, over GitHub's limit); its
   `ReadMe.txt` says where to download it.
+- The author's dataset notes (`Datasets-Tree.txt`, the `ReadMe.txt` files) record the type
+  folders, the rewritten `.dat` files and the datasets that left the folder.
 
 ## [0.4.1] — 2026-10-11 — the explorer's owner
 

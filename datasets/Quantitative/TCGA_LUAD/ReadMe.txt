@@ -1,5 +1,5 @@
 # created_date:  05.06.2026
-# updated_date:  16.10.2026
+# updated_date:  17.10.2026
 
 Obyektlar soni – 589 ta.
 
@@ -12,6 +12,12 @@ Alomatlar soni – 57772 ta (sinf ustuni bu songa kirmaydi).
 !!! satrda bemorlar, ustunda genlar, oxirgi ustun sinf
 
 !!! log-transformatsiya qilingan
+
+!!! Fayllar faqat shu kompyuterda saqlanadi: har biri 391 MB, GitHub chegarasidan
+!!! (100 MB) katta, shuning uchun .gitignore da; bu ReadMe GitHub'da bor.
+!!! Fayllarni shu papkaga qo'ysangiz, erdr ularni o'zi topadi (tcga-luad-589).
+!!! 17.10.2026: .dat fayl default.dat formatiga o'tkazildi (LF qator oxiri, qiymatlar
+!!! o'nli kasr ko'rinishida: 4 -> 4.0); qiymatlar o'zgarmagan, .csv bilan tekshirilgan.
 
 #######################################################
 
