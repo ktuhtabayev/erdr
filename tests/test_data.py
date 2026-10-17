@@ -11,6 +11,7 @@ from erdr.config.models import DatasetConfig
 from erdr.data import (
     DATASETS,
     Dataset,
+    DatasetType,
     FeatureType,
     detect_format,
     extended_text,
@@ -22,15 +23,17 @@ from erdr.data import (
 )
 from erdr.data.catalog import (
     ENVIRONMENT_VARIABLE,
+    check_entry,
     discover,
     find_datasets_root,
     project_catalog,
     read_shape,
     resolve_dataset,
 )
+from erdr.data.writers import convention_problem
 from erdr.errors import DatasetError
 from tests.conftest import DATASETS as DATASETS_DIR
-from tests.conftest import HEART_270, ROOT, SELECTED_ROWS, WORKBOOK
+from tests.conftest import FOLDER_FILES, HEART_270, LOCAL_ONLY, ROOT, SELECTED_ROWS, WORKBOOK
 
 # ---------------------------------------------------------------- the default dataset files
 
@@ -55,27 +58,41 @@ def test_default_dataset_is_the_workbook_dataset(default_dataset: Dataset):
     assert default_dataset.type_flags == (1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0)
 
 
-@pytest.mark.parametrize("stem", ["default", "Heart-Disease/Heart-Disease (270, 13, 2)"])
-@pytest.mark.parametrize("suffix", [".csv", ".dat"])
-def test_writer_reproduces_the_author_files_byte_for_byte(stem: str, suffix: str):
-    path = DATASETS_DIR / f"{stem}{suffix}"
-    assert extended_text(load_dataset(path), suffix).encode("utf-8") == path.read_bytes()
+@pytest.mark.parametrize("path", FOLDER_FILES, ids=lambda p: p.name)
+def test_writer_reproduces_the_author_files_byte_for_byte(path: Path):
+    """Every dataset file is in the author's conventions — those of default.csv / default.dat."""
+    dataset = load_dataset(path)
+    assert extended_text(dataset, path.suffix).encode("utf-8") == path.read_bytes()
+    assert convention_problem(path, dataset) == ""
 
 
-def test_csv_and_dat_hold_the_same_data():
-    csv = load_dataset(HEART_270.parent / f"{HEART_270.name}.csv")
-    dat = load_dataset(HEART_270.parent / f"{HEART_270.name}.dat")
+@pytest.mark.parametrize(
+    "stem", sorted({p.with_suffix("") for p in FOLDER_FILES}), ids=lambda p: p.name
+)
+def test_csv_and_dat_hold_the_same_data(stem: Path):
+    csv = load_dataset(stem.with_name(f"{stem.name}.csv"))
+    dat = load_dataset(stem.with_name(f"{stem.name}.dat"))
     assert csv.content_hash() == dat.content_hash()
-    assert csv.class_sizes == (150, 120)
 
 
 def test_builtin_copies_match_the_folder(default_dataset: Dataset, heart270: Dataset):
     assert load_builtin("heart-disease-7").content_hash() == default_dataset.content_hash()
     folder = load_dataset(HEART_270.parent / f"{HEART_270.name}.dat")
     assert heart270.content_hash() == folder.content_hash()
-    assert set(DATASETS.names()) == {"heart-disease-7", "heart-disease-270", "guide-example"}
     guide = load_builtin("guide-example")
     assert (guide.m, guide.n, guide.class_sizes) == (7, 4, (3, 4))
+    catalog = project_catalog(ROOT)
+    assert catalog is not None
+    built_in = set(DATASETS.names()) - {"heart-disease-7", "guide-example"}
+    for name in built_in:  # byte-for-byte copies of the folder's .csv, of the folder's type
+        entry = catalog.find(name)
+        assert entry is not None
+        info = DATASETS.get(name)
+        packaged = ROOT / "src" / "erdr" / "data" / "datasets" / info.filename
+        assert packaged.read_bytes() == entry.path.with_suffix(".csv").read_bytes()
+        assert info.dataset_type is entry.dataset_type is info.load().dataset_type
+    # every dataset of the folder is built in, except the local-only ones
+    assert built_in == {e.id for e in catalog if e.family != "default" and e.size <= LOCAL_ONLY}
 
 
 # ---------------------------------------------------------------- loaders
@@ -213,19 +230,39 @@ def test_write_extended(tmp_path: Path, default_dataset: Dataset):
 # ---------------------------------------------------------------- the dataset folder
 
 
+KEPT_IN_GIT = {
+    "Quantitative": ["cancer-589", "hypertension-147", "spambase-4204"],
+    "Nominal": [
+        "molecular-biology-100-10",
+        "molecular-biology-100-50",
+        "molecular-biology-106",
+        "uzb-kor-100",
+    ],
+    "Heterogeneous": ["german-1000", "heart-disease-270", "ionosfera-350"],
+}
+"""The datasets of the type folders that are kept in Git (ADR-021)."""
+
+
 def test_project_catalog():
     catalog = project_catalog(ROOT)
     assert catalog is not None
-    assert [e.id for e in catalog] == ["default", "heart-disease-270"]
+    small = [e for e in catalog if e.size <= LOCAL_ONLY]
+    assert [e.id for e in small] == ["default", *(i for ids in KEPT_IN_GIT.values() for i in ids)]
     assert catalog.default is not None
     assert catalog.default.shape == (7, 13, 2)
     assert catalog.default.label == "default (7, 13, 2)"
     entry = catalog.find("Heart-Disease (270, 13, 2)")
     assert entry is not None
     assert entry.family == "Heart-Disease"
+    assert entry.dataset_type is DatasetType.HETEROGENEOUS
     assert entry.formats == (".dat", ".csv")
-    assert all(check.passed for check in catalog.check())
-    assert len(catalog) == 2
+    groups = dict(catalog.groups())
+    assert list(groups) == ["default", "Quantitative", "Nominal", "Heterogeneous"]
+    for title, ids in KEPT_IN_GIT.items():
+        assert [e.id for e in groups[title] if e.size <= LOCAL_ONLY] == ids
+    for check in (check_entry(e) for e in small):
+        assert check.passed, check.problems
+        assert check.dataset_type is (check.entry.dataset_type or DatasetType.HETEROGENEOUS)
 
 
 def test_discover_layout(tmp_path: Path):

@@ -1,12 +1,16 @@
 """The project's dataset folder: discovery, identity checks and name resolution (ADR-007).
 
-Layout (the author's, as in the template project)::
+Layout (the author's, ADR-007 and ADR-021)::
 
     datasets/
       default.dat, default.csv          the default dataset: Heart-Disease (7, 13, 2)
+      Quantitative/<Family>/<Name (m, n, c)>.dat|.csv
+                                        datasets whose features are all quantitative,
+      Nominal/<Family>/…                all nominal,
+      Heterogeneous/<Family>/…          or both, e.g.
+                                        Heterogeneous/Heart-Disease/Heart-Disease (270, 13, 2).dat
       <Family>/<Name (m, n, c)>.dat|.csv
-                                        further datasets, one sub-folder per family,
-                                        e.g. Heart-Disease/Heart-Disease (270, 13, 2).dat
+                                        a family folder outside the type folders is read too
       synthetic/                        reserved for pre-existing synthetic datasets — not read
 
 Every file is in the extended layout (:func:`~erdr.data.loaders.load_extended_layout`): a first
@@ -15,9 +19,10 @@ row ``m n c``; m rows of n feature values and the class label; a last row of n t
 comma-separated; the files are kept byte for byte.
 
 The ``.dat`` and ``.csv`` files of one stem are the same dataset in two formats: the ``.dat`` is
-read, and :meth:`DatasetCatalog.check` verifies that both hold identical data and that the
-header's (m, n, c) matches the file name. A new dataset is added by dropping its files into a
-family folder — nothing has to be registered.
+read, and :meth:`DatasetCatalog.check` verifies that both hold identical data, that the header's
+(m, n, c) matches the file name, that the feature types match the type folder and that every
+file is written in the author's conventions byte for byte. A new dataset is added by dropping
+its files into a family folder of its type — nothing has to be registered.
 
 Datasets are named by id (``heart-disease-270``), by display name (``Heart-Disease (270, 13, 2)``),
 by ``default`` or by a file path. Without a ``datasets`` folder the package's built-in copies are
@@ -35,8 +40,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from erdr.data.loaders import LoadOptions, load_extended_layout
-from erdr.data.schema import Dataset
+from erdr.data.schema import Dataset, DatasetType
+from erdr.data.writers import convention_problem
 from erdr.errors import DatasetError
+from erdr.notation import feature_name
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +85,8 @@ class CatalogEntry:
     """``default`` or the family folder (``Heart-Disease``)."""
     shape: tuple[int, int, int] | None
     """(m, n, c) from the file name (the default dataset: from its first row)."""
+    dataset_type: DatasetType | None = None
+    """The type folder the dataset is in (``Heterogeneous/…``), ``None`` outside them."""
 
     @property
     def path(self) -> Path:
@@ -88,6 +97,11 @@ class CatalogEntry:
     def formats(self) -> tuple[str, ...]:
         """The extensions present, e.g. ``(".dat", ".csv")``."""
         return tuple(f.suffix.lower() for f in self.files)
+
+    @property
+    def size(self) -> int:
+        """Bytes of the file that is read."""
+        return self.path.stat().st_size
 
     @property
     def label(self) -> str:
@@ -110,6 +124,8 @@ class EntryCheck:
     """(m, n, c) as loaded."""
     content_hash: str | None
     """Hash of the data (values, types, labels) of the preferred file."""
+    dataset_type: DatasetType | None = None
+    """The type of the data as loaded (from the feature types)."""
     sha256: dict[str, str] = field(default_factory=dict)
     """SHA-256 of every file, by extension."""
     problems: tuple[str, ...] = ()
@@ -154,12 +170,29 @@ class DatasetCatalog:
         return next((e for e in self.entries if e.family == DEFAULT_ID), None)
 
     def __iter__(self) -> Iterator[CatalogEntry]:
-        """Iterate over the entries (the default first, then the others by name)."""
+        """Iterate over the entries: the default, then by type folder and name, then the rest."""
         return iter(self.entries)
 
     def __len__(self) -> int:
         """Number of datasets."""
         return len(self.entries)
+
+    def groups(self) -> tuple[tuple[str, tuple[CatalogEntry, ...]], ...]:
+        """The entries by folder, empty groups left out.
+
+        ``default``, then the type folders ``Quantitative``, ``Nominal``, ``Heterogeneous``,
+        then ``Other`` for family folders outside them.
+        """
+        titles = ["default", *(kind.folder for kind in DatasetType), "Other"]
+        grouped: dict[str, list[CatalogEntry]] = {title: [] for title in titles}
+        for entry in self.entries:
+            if entry.family == DEFAULT_ID:
+                grouped["default"].append(entry)
+            elif entry.dataset_type is not None:
+                grouped[entry.dataset_type.folder].append(entry)
+            else:
+                grouped["Other"].append(entry)
+        return tuple((title, tuple(found)) for title, found in grouped.items() if found)
 
     def find(self, key: str) -> CatalogEntry | None:
         """The entry with this id or display name (case-insensitive), or ``None``."""
@@ -173,38 +206,75 @@ class DatasetCatalog:
         """Load every file of every entry; compare the header with the name and the formats.
 
         Returns:
-            One result per entry: the shape and data hash as loaded, the SHA-256 of every file
-            and the problems found (a header that contradicts the file name, formats that hold
-            different data, unreadable files).
+            One result per entry: the shape, type and data hash as loaded, the SHA-256 of every
+            file and the problems found (a header that contradicts the file name, formats that
+            hold different data, feature types that contradict the type folder, a file not in
+            the author's conventions, unreadable files).
         """
-        results = []
-        for entry in self.entries:
-            problems: list[str] = []
-            sha = {f.suffix.lower(): file_sha256(f) for f in entry.files}
-            loaded: dict[str, Dataset] = {}
-            for file in entry.files:
-                try:
-                    loaded[file.suffix.lower()] = load_extended(file, entry.name)
-                except DatasetError as error:
-                    problems.append(str(error))
-            first = next(iter(loaded.values()), None)
-            shape = (first.m, first.n, len(first.classes)) if first is not None else None
-            if first is not None and entry.shape is not None and shape != entry.shape:
+        return [check_entry(entry) for entry in self.entries]
+
+
+def type_rule_problem(entry: CatalogEntry, dataset: Dataset) -> str:
+    """How ``dataset`` breaks the rule of its type folder, or ``""`` (ADR-021).
+
+    ``Quantitative/`` holds datasets whose features are all quantitative, ``Nominal/`` all
+    nominal, ``Heterogeneous/`` both.
+    """
+    folder = entry.dataset_type
+    found = dataset.dataset_type
+    if folder is None or found is folder:
+        return ""
+    if folder is DatasetType.HETEROGENEOUS:
+        return (
+            f"{entry.name} is in {folder.folder}/, but all {dataset.n} features are {found.value} "
+            f"— a heterogeneous dataset has quantitative and nominal features ({found.folder}/)"
+        )
+    other = dataset.nominal if folder is DatasetType.QUANTITATIVE else dataset.quantitative
+    names = [feature_name(j) for j in range(dataset.n) if other[j]]
+    shown = ", ".join(names[:8]) + (", …" if len(names) > 8 else "")
+    kind = "nominal" if folder is DatasetType.QUANTITATIVE else "quantitative"
+    return (
+        f"{entry.name} is in {folder.folder}/, but {len(names)} feature(s) are {kind} ({shown}) "
+        f"— every feature of a {folder.value} dataset is {folder.value} ({found.folder}/)"
+    )
+
+
+def check_entry(entry: CatalogEntry) -> EntryCheck:
+    """The check of one entry (see :meth:`DatasetCatalog.check`)."""
+    problems: list[str] = []
+    sha = {f.suffix.lower(): file_sha256(f) for f in entry.files}
+    hashes: dict[str, str] = {}
+    shape: tuple[int, int, int] | None = None
+    dataset_type: DatasetType | None = None
+    for file in entry.files:  # one file in memory at a time: TCGA_LUAD holds 34 million values
+        try:
+            dataset = load_extended(file, entry.name)
+        except DatasetError as error:
+            problems.append(str(error))
+            continue
+        hashes[file.suffix.lower()] = dataset.content_hash()
+        conventions = convention_problem(file, dataset)
+        if conventions:
+            problems.append(f"not in the author's conventions — {conventions}")
+        if shape is None:  # the shape and the type of the first file that loads
+            shape = (dataset.m, dataset.n, len(dataset.classes))
+            dataset_type = dataset.dataset_type
+            if entry.shape is not None and shape != entry.shape:
                 problems.append(
                     f"{entry.path.name}: the file holds {shape}, its name says {entry.shape}"
                 )
-            hashes = {ext: d.content_hash() for ext, d in loaded.items()}
-            if len(set(hashes.values())) > 1:
-                problems.append(
-                    f"{entry.name}: the {' and '.join(hashes)} files hold different data "
-                    f"({entry.path.suffix} is used)"
-                )
-            results.append(
-                EntryCheck(
-                    entry, shape, hashes.get(entry.path.suffix.lower()), sha, tuple(problems)
-                )
-            )
-        return results
+            rule = type_rule_problem(entry, dataset)
+            if rule:
+                problems.append(rule)
+        del dataset
+    if len(set(hashes.values())) > 1:
+        problems.append(
+            f"{entry.name}: the {' and '.join(hashes)} files hold different data "
+            f"({entry.path.suffix} is used)"
+        )
+    return EntryCheck(
+        entry, shape, hashes.get(entry.path.suffix.lower()), dataset_type, sha, tuple(problems)
+    )
 
 
 def find_datasets_root(start: Path | None = None) -> Path | None:
@@ -245,6 +315,14 @@ def _family_files(root: Path) -> list[Path]:
     return found
 
 
+def _family(parts: tuple[str, ...]) -> tuple[str, DatasetType | None]:
+    """(family, type folder) of a file's path inside the dataset folder."""
+    dataset_type = DatasetType.from_folder(parts[0])
+    if dataset_type is not None and len(parts) > 2:
+        return parts[1], dataset_type
+    return parts[0], None
+
+
 def discover(root: Path) -> DatasetCatalog:
     """Scan a ``datasets`` folder (see the module docstring for the layout)."""
     entries: list[CatalogEntry] = []
@@ -253,21 +331,26 @@ def discover(root: Path) -> DatasetCatalog:
     if present:
         shape = read_shape(present[0])
         entries.append(CatalogEntry(DEFAULT_ID, DEFAULT_STEM, tuple(present), DEFAULT_ID, shape))
-    found: list[tuple[str, tuple[Path, ...], tuple[int, int, int] | None, str]] = []
-    groups = sorted(_grouped(_family_files(root)).items(), key=lambda item: item[0].name.lower())
-    for stem, group in groups:
-        family = group[0].relative_to(root).parts[0]
+    found: list[
+        tuple[str, tuple[Path, ...], tuple[int, int, int] | None, str, DatasetType | None]
+    ] = []
+    for stem, group in _grouped(_family_files(root)).items():
+        family, dataset_type = _family(group[0].relative_to(root).parts)
         match = _SHAPE.match(stem.name)
         if match:
             m, n, c = int(match["m"]), int(match["n"]), int(match["c"])
-            found.append((f"{_slug(match['name'])}-{m}", tuple(group), (m, n, c), family))
+            base, shape = f"{_slug(match['name'])}-{m}", (m, n, c)
         else:
-            found.append((_slug(stem.name), tuple(group), None, family))
-    bases = [base for base, _, _, _ in found]
-    for base, files, shape, family in found:
-        shared = bases.count(base) > 1 and shape is not None  # e.g. DDos (10000, 80 | 22, 2)
+            base, shape = _slug(stem.name), None
+        found.append((base, tuple(group), shape, family, dataset_type))
+    # the type folders in their order (quantitative, nominal, heterogeneous), then the others
+    order = list(DatasetType)
+    found.sort(key=lambda f: (order.index(f[4]) if f[4] else len(order), f[1][0].stem.lower()))
+    bases = [base for base, *_ in found]
+    for base, files, shape, family, dataset_type in found:
+        shared = bases.count(base) > 1 and shape is not None  # Molecular-Biology (100, 10 | 50, 2)
         identifier = f"{base}-{shape[1]}" if shared and shape else base
-        entries.append(CatalogEntry(identifier, files[0].stem, files, family, shape))
+        entries.append(CatalogEntry(identifier, files[0].stem, files, family, shape, dataset_type))
     ids = [e.id for e in entries]
     duplicates = sorted({i for i in ids if ids.count(i) > 1})
     if duplicates:

@@ -19,8 +19,18 @@ preprocessing:
     params: {}
 distance:
   metric:
-    name: zhuravlev
+    name: auto
     params: {}
+  type_metrics:
+    quantitative:
+      name: manhattan
+      params: {}
+    nominal:
+      name: hamming
+      params: {}
+    heterogeneous:
+      name: zhuravlev
+      params: {}
   features: auto
   decimals: 10
 erdr:

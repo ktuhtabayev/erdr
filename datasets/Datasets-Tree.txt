@@ -1,0 +1,131 @@
+|
+|   * alomatlar soniga sinf ustuni kirmaydi (fayl nomidagi 2-son bilan bir xil).
+|
+###############################
+#                             #
+#       FAQAT MIQDORIY:       #
+#                             #
+###############################
+|
+|---- it-bo'ri-------|
+                     |- obyektlar soni: 42 ta
+                     |- alomatlar soni: 6 ta
+                        - miqdoriy: 6 ta
+                        - nominal : 0 ta
+                        - sinflar : 2 ta
+|
+|---- gipertoniya ---|
+                     |- obyektlar soni: 147 ta
+                     |- alomatlar soni: 29 ta
+                        - miqdoriy: 29 ta
+                        - nominal : 0 ta
+                        - sinflar : 2 ta
+|
+|---- TCGA_LUAD -----|
+                     |- obyektlar soni: 589    ta
+                     |- alomatlar soni: 57772  ta
+                        - miqdoriy: 57772  ta
+                        - nominal : 0      ta
+                        - sinflar : 2      ta
+|
+|---- iris ----------|
+                     |- obyektlar soni: 147 ta
+                     |- alomatlar soni: 4 ta
+                        - miqdoriy: 4 ta
+                        - nominal : 0 ta
+                        - sinflar : 3 ta
+|
+|---- gepatit -------|
+                     |- obyektlar soni: 268 ta
+                     |- alomatlar soni: 18  ta
+                        - miqdoriy: 18 ta
+                        - nominal : 0  ta
+                        - sinflar : 3  ta
+|
+|-- wine_quality ----|
+                     |- obyektlar soni: qizil vino: 1359 ta, oq vino: 3961 ta
+                     |- alomatlar soni: 11  ta
+                        - miqdoriy: 11 ta
+                        - nominal : 0  ta
+                        - sinflar : qizil vino: 6 ta, oq vino: 7 ta
+|
+|---- ionosfera -----|
+                     |- obyektlar soni: 350 ta
+                     |- alomatlar soni: 33 ta
+                        - miqdoriy: 32 ta
+                        - nominal : 1 ta (1-alomat, 0/1 qiymatli)
+                        - sinflar : 2 ta
+|
+|---- cancer --------|
+                     |- obyektlar soni: 589 ta
+                     |- alomatlar soni: 44 ta
+                        - miqdoriy: 44 ta
+                        - nominal : 0 ta
+                        - sinflar : 2 ta
+                     (Cancer-N: shu 44 alomatning nominal (1/2) versiyasi)
+|
+|---- ddos ----------|
+                     |- obyektlar soni: 10000 ta
+                     |- alomatlar soni: 80 ta (22 ta alomatli versiyasi ham bor)
+                        - miqdoriy: 79 ta
+                        - nominal : 1 ta (79-alomat, barcha qiymatlari 0)
+                        - sinflar : 2 ta
+                     (DDoS-N: 80 alomatning nominal versiyasi)
+|
+|---- spambase ------|
+                     |- obyektlar soni: 4595 ta (takrorsiz versiyasi: 4204 ta)
+                     |- alomatlar soni: 57 ta
+                        - miqdoriy: 57 ta
+                        - nominal : 0 ta
+                        - sinflar : 2 ta
+|
+|
+###############################
+#                             #
+#       FAQAT NOMINAL:        #
+#                             #
+###############################
+|
+|
+|---- uzbek_koreys --|
+                     |- obyektlar soni: 100 ta
+                     |- alomatlar soni: 24  ta
+                        - miqdoriy: 0  ta
+                        - nominal : 24 ta
+                        - sinflar : 2  ta
+|
+|- molecular_biology |
+                     |- obyektlar soni: 106 ta
+                     |- alomatlar soni: 57  ta
+                        - miqdoriy: 0  ta
+                        - nominal : 57 ta
+                        - sinflar : 2  ta
+|
+|
+###############################
+#                             #
+#           ARALASH:          #
+#                             #
+###############################
+|
+|
+|---- german --------|
+                     |- obyektlar soni: 1000 ta
+                     |- alomatlar soni: 20 ta
+                        - miqdoriy: 7 ta
+                        - nominal : 13 ta
+                        - sinflar : 2 ta
+|
+|-- heart_disease ---|
+                     |- obyektlar soni: 270 ta (shuningdek 1025 va 10 ta obyektli versiyalari)
+                     |- alomatlar soni: 13 ta
+                        - miqdoriy: 6 ta
+                        - nominal : 7 ta
+                        - sinflar : 2 ta
+|
+|
+|
+|
+|
+|
+|

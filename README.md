@@ -37,21 +37,22 @@ Step 5  |L| > 1 → g(Sⱼ) − 1 for Sⱼ ∈ L;  g(Sⱼ) = 1 → Sⱼ to D    
 | Part | Content | State |
 |---|---|---|
 | Core | Step 0 (8 normalizers, 12 metrics), Steps 1–6, the readings A, B, C and z, the 17 cases, Steps 1–5 as hyperspheres | ✓ |
-| Data | extended `.csv`/`.dat` layout (read and written byte for byte), CSV/Excel tables, the ERDR workbook, Parquet; dataset folder and built-in datasets | ✓ |
+| Data | extended `.csv`/`.dat` layout (read and written byte for byte), CSV/Excel tables, the ERDR workbook, Parquet; the dataset folder by type — Quantitative, Nominal, Heterogeneous — with 11 datasets, every one also built in except TCGA_LUAD ([Datasets](docs/datasets.md)) | ✓ |
+| Metrics | the metric follows the dataset type (`auto`): Zhuravlev on heterogeneous data, its Manhattan or Hamming part on quantitative or nominal data — the same distances; a metric the dataset lacks the features for is refused, a partial one flagged | ✓ |
 | Configuration | typed (pydantic), YAML/TOML/JSON, presets `literal` and `closest`, hashing | ✓ |
 | Services | runner, repeatable run folders, readings comparison, k sweeps, workbook validation | ✓ |
 | Exports | CSV, JSON, Markdown, LaTeX, Excel (laid out like the workbook), PNG/SVG figures and an animated GIF of the iterations, HTML report, training/validation datasets | ✓ |
 | Visualizations | 2-D map, r and z, priorities, sample sizes, class composition; hyperspheres of every object, neighbourhood strips, radius plane, the spheres of every iteration ([Visualizations](docs/visualizations.md)) | ✓ |
 | Interfaces | `erdr` CLI, desktop GUI (PySide6) in the template's design with light and dark themes and a hypersphere explorer (◀ ▶, Play), portable Windows executable | ✓ |
 | Colours | one colour per meaning in the GUI, Excel, HTML, figures and console — feature types, classes, D and F, parameters, steps, ⚠ non-literal readings (the workbook's legend) | ✓ |
-| Quality | 187 tests (golden: workbook, guide, Table 1; property-based; GUI), 95 % coverage, mypy strict, ruff, Windows CI | ✓ |
+| Quality | 242 tests (golden: workbook, guide, Table 1; property-based; GUI; every dataset file byte for byte), 95 % coverage, mypy strict, ruff, Windows CI | ✓ |
 
 ## The desktop application without Python
 
 Download `erdr-gui-<version>-windows.zip` from the
 [latest release](https://github.com/ktuhtabayev/erdr/releases/latest) (or build it with
 `scripts\build_exe.py`), unpack it anywhere and start `erdr-gui.exe`. Nothing is installed; the
-Heart-Disease datasets are built in. The window is light by default; **View → Dark theme** (or
+datasets are built in (all of them except TCGA_LUAD). The window is light by default; **View → Dark theme** (or
 **Ctrl+T**) and **Follow Windows** switch it, and **Ctrl++ / Ctrl+−** zoom.
 
 ![The results of the default experiment](docs/images/gui/results-iterations.png)
@@ -79,7 +80,8 @@ Commands:
 .\.venv\Scripts\erdr.exe validate                               # every sheet of the workbook (2,927 checks)
 .\.venv\Scripts\erdr.exe run --save --export all                # run folder + every export format
 .\.venv\Scripts\erdr.exe export -f xlsx,html --readings --sweep # export the latest run again
-.\.venv\Scripts\erdr.exe data list ; .\.venv\Scripts\erdr.exe plugins
+.\.venv\Scripts\erdr.exe run uzb-kor-100 --brief                # a nominal dataset: metric hamming (auto)
+.\.venv\Scripts\erdr.exe data list ; .\.venv\Scripts\erdr.exe data check ; .\.venv\Scripts\erdr.exe plugins
 .\.venv\Scripts\erdr.exe config init my.yaml ; .\.venv\Scripts\erdr.exe run -c my.yaml
 .\.venv\Scripts\erdr.exe gui                                    # the desktop application
 ```
@@ -104,7 +106,8 @@ closest.result.training.size  # 75
 
 ```text
 configs/            configurations: default (the workbook), Heart-Disease 270 literal / closest
-datasets/           default.csv/.dat = Heart-Disease (7, 13, 2); Heart-Disease/… (270, 13, 2)
+datasets/           default.csv/.dat = Heart-Disease (7, 13, 2); Quantitative/, Nominal/,
+                    Heterogeneous/ — the datasets by type (Heterogeneous/Heart-Disease/… (270, 13, 2))
 docs/               documentation (mkdocs), DECISIONS.md, GUI screenshots
 resources/          the ERDR workbook, the step-by-step guide, the article (read-only)
 scripts/            Windows executable build, GUI screenshots, documentation figures
@@ -133,5 +136,6 @@ The article is in preparation; its text is not part of the public repository.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Heart-Disease is the Statlog (Heart) dataset of the UCI Machine
-Learning Repository (CC BY 4.0).
+MIT — see [LICENSE](LICENSE). Heart-Disease, German, Spambase and Molecular-Biology come from the
+UCI Machine Learning Repository (CC BY 4.0); the sources of the other datasets are in their
+`ReadMe.txt` files.

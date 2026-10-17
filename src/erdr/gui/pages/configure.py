@@ -2,6 +2,10 @@
 
 A switch set to something other than the literal article text is shown in the warning colours,
 and so is the preset badge whenever the reading is not the literal one (ADR-003, ADR-019).
+
+The metric follows the dataset type (ADR-022): ``auto`` takes the metric of the type — one per
+type, chosen below it among the metrics that suit the type — and a metric that is not defined
+on the loaded dataset's features cannot be chosen.
 """
 
 from __future__ import annotations
@@ -11,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -26,23 +31,32 @@ from PySide6.QtWidgets import (
 
 from erdr.config.io import load_config, save_config
 from erdr.config.models import (
+    AUTO_METRIC,
     DistanceConfig,
     ERDRConfig,
     ExperimentConfig,
     PluginSpec,
     PreprocessingConfig,
     ReadingsConfig,
+    TypeMetricsConfig,
 )
 from erdr.config.presets import PresetName, matching_preset, preset, reading_notes
 from erdr.core.k_rule import permitted_k
 from erdr.core.metrics import METRICS, traits_of
 from erdr.core.normalizers import NORMALIZERS
 from erdr.core.readings import BlockedCover, SelfInL, Step5Return, ZScope
-from erdr.data.schema import Dataset
+from erdr.data.schema import Dataset, DatasetType
 from erdr.errors import ERDRError
 from erdr.gui.forms import ParamsForm
 from erdr.gui.state import AppState
 from erdr.gui.widgets import Page, WarningBox, badge, hint
+from erdr.services.datasets import (
+    Suitability,
+    choose_metric,
+    is_auto,
+    suitability,
+    suited_metrics,
+)
 
 CONFIG_FILTER = "Configurations (*.yaml *.yml *.toml *.json);;All files (*)"
 READING_CHOICES: dict[str, list[tuple[str, Any]]] = {
@@ -71,9 +85,11 @@ class ConfigurePage(Page):
     title = "Configure"
     explanation = (
         "The defaults reproduce the ERDR workbook: min–max scaling, the Zhuravlev metric, k = 3, "
-        "ε = 0.001 and the literal reading of §1.1 (A = B = C = 1). The article leaves three "
-        "points open; the readings A, B, C and the scope of z switch between them — a reading "
-        "other than the literal one is flagged everywhere."
+        "ε = 0.001 and the literal reading of §1.1 (A = B = C = 1). The metric follows the "
+        "dataset type (auto): Zhuravlev on heterogeneous data, its Manhattan or Hamming part on "
+        "quantitative or nominal data — the same distances. The article leaves three points "
+        "open; the readings A, B, C and the scope of z switch between them — a reading other "
+        "than the literal one is flagged everywhere."
     )
 
     def __init__(
@@ -116,6 +132,13 @@ class ConfigurePage(Page):
         self.normalizer_params = ParamsForm()
         self.normalizer_note = hint("", "note")
         self.metric_box = QComboBox()
+        self.metric_box.addItem("auto — the metric of the dataset type", AUTO_METRIC)
+        self.metric_box.setItemData(
+            0,
+            "Quantitative, nominal and heterogeneous datasets each get their metric "
+            "(distance.type_metrics, below)",
+            Qt.ItemDataRole.ToolTipRole,
+        )
         for info in METRICS:
             domain = traits_of(info.obj).domain
             label = info.name + ("" if domain == "any" else f"  ({domain} features)")
@@ -125,6 +148,16 @@ class ConfigurePage(Page):
             )
         self.metric_params = ParamsForm()
         self.metric_note = hint("", "note")
+        self.type_metric_boxes: dict[DatasetType, QComboBox] = {}
+        for kind in DatasetType:
+            type_box = QComboBox()
+            for name in suited_metrics(kind):
+                type_box.addItem(name, name)
+                type_box.setItemData(
+                    type_box.count() - 1, METRICS.info(name).summary, Qt.ItemDataRole.ToolTipRole
+                )
+            type_box.setToolTip(f"The metric auto takes on {kind.value} datasets")
+            self.type_metric_boxes[kind] = type_box
         self.features = QComboBox()
         for value, text in (
             ("auto", "auto — the metric's domain"),
@@ -139,8 +172,11 @@ class ConfigurePage(Page):
         form0.addRow("", self.normalizer_note)
         form0.addRow(self.normalizer_params)
         form0.addRow("Metric ρ", self.metric_box)
+        for kind, type_box in self.type_metric_boxes.items():
+            form0.addRow(f"  auto · {kind.value}", type_box)
         form0.addRow("", self.metric_note)
         form0.addRow(self.metric_params)
+        self.form0 = form0
         form0.addRow("Features", self.features)
         form0.addRow("Distance decimals", self.decimals)
         columns.addWidget(step0, 1)
@@ -181,6 +217,7 @@ class ConfigurePage(Page):
         for box in (
             self.normalizer_box,
             self.metric_box,
+            *self.type_metric_boxes.values(),
             self.features,
             self.k_rule,
             *self.readings.values(),
@@ -210,10 +247,16 @@ class ConfigurePage(Page):
                 config.preprocessing.normalizer.name,
                 dict(config.preprocessing.normalizer.params),
             )
-            self._select(self.metric_box, METRICS.info(config.distance.metric.name).name)
-            self.metric_params.set_plugin(
-                METRICS, config.distance.metric.name, dict(config.distance.metric.params)
-            )
+            metric = config.distance.metric
+            if is_auto(metric):
+                self._select(self.metric_box, AUTO_METRIC)
+                self.metric_params.clear()
+            else:
+                self._select(self.metric_box, METRICS.info(metric.name).name)
+                self.metric_params.set_plugin(METRICS, metric.name, dict(metric.params))
+            for kind, type_box in self.type_metric_boxes.items():
+                spec = config.distance.type_metrics.for_type(kind.value)
+                self._select(type_box, METRICS.info(spec.name).name)
             features = (
                 config.distance.features if isinstance(config.distance.features, str) else "auto"
             )
@@ -257,6 +300,7 @@ class ConfigurePage(Page):
         base = getattr(self, "_base", self.state.config)
         normalizer = str(self.normalizer_box.currentData())
         metric = str(self.metric_box.currentData())
+        params = {} if metric == AUTO_METRIC else self.metric_params.values()
         readings = ReadingsConfig(
             self_in_l=self.readings["self_in_l"].currentData(),
             blocked_cover=self.readings["blocked_cover"].currentData(),
@@ -271,7 +315,8 @@ class ConfigurePage(Page):
                     normalizer=PluginSpec(name=normalizer, params=self.normalizer_params.values())
                 ),
                 "distance": DistanceConfig(
-                    metric=PluginSpec(name=metric, params=self.metric_params.values()),
+                    metric=PluginSpec(name=metric, params=params),
+                    type_metrics=self._type_metrics(base),
                     features=explicit
                     if explicit and chosen_features == "auto"
                     else chosen_features,
@@ -287,6 +332,17 @@ class ConfigurePage(Page):
             }
         )
 
+    def _type_metrics(self, base: ExperimentConfig) -> TypeMetricsConfig:
+        """The metric of each dataset type; a metric kept from ``base`` keeps its parameters."""
+        chosen: dict[str, PluginSpec] = {}
+        for kind, type_box in self.type_metric_boxes.items():
+            name = str(type_box.currentData())
+            before = base.distance.type_metrics.for_type(kind.value)
+            chosen[kind.value] = PluginSpec(
+                name=name, params=before.params if before.name == name else {}
+            )
+        return TypeMetricsConfig(**chosen)
+
     def _edited(self) -> None:
         if self._loading:
             return
@@ -296,7 +352,11 @@ class ConfigurePage(Page):
                 NORMALIZERS, str(self.normalizer_box.currentData()), {}
             )
         if sender is self.metric_box:
-            self.metric_params.set_plugin(METRICS, str(self.metric_box.currentData()), {})
+            metric = str(self.metric_box.currentData())
+            if metric == AUTO_METRIC:
+                self.metric_params.clear()
+            else:
+                self.metric_params.set_plugin(METRICS, metric, {})
         try:
             config = self.current()
         except (ERDRError, ValueError) as error:
@@ -317,7 +377,13 @@ class ConfigurePage(Page):
         chosen = matching_preset(config)
         self.preset_badge.setText(chosen.value if chosen else "custom")
         self.normalizer_note.setText(NORMALIZERS.info(config.preprocessing.normalizer.name).summary)
-        self.metric_note.setText(METRICS.info(config.distance.metric.name).summary)
+        dataset = self.state.dataset
+        metric_note, metric_warning = self._metric_texts(config, dataset)
+        self.metric_note.setText(metric_note)
+        self._mark_metrics(dataset)
+        automatic = is_auto(config.distance.metric)
+        for type_box in self.type_metric_boxes.values():
+            self.form0.setRowVisible(type_box, automatic)
         notes = reading_notes(config)
         for field, box in self.readings.items():
             literal = READING_CHOICES[field][0][1]  # the first choice is the article's text
@@ -328,12 +394,14 @@ class ConfigurePage(Page):
             )
         self.preset_badge.setObjectName("warningBadge" if notes else "badge")
         self._flag(self.preset_badge, "literal", not notes)
-        self.warning.set_text(
-            "⚠ Not the literal article reading: " + "; ".join(n.statement for n in notes)
-            if notes
-            else ""
-        )
-        dataset = self.state.dataset
+        messages = []
+        if notes:
+            messages.append(
+                "⚠ Not the literal article reading: " + "; ".join(n.statement for n in notes)
+            )
+        if metric_warning:
+            messages.append(f"⚠ {metric_warning}")
+        self.warning.set_text("\n".join(messages))
         if dataset is None:
             self.permitted.setText("k rule: odd k from 3 to 2·min|Kᵢ| − 3 (load a dataset)")
         else:
@@ -341,6 +409,51 @@ class ConfigurePage(Page):
             rule = permitted_k(sizes)
             ok = "✓" if config.erdr.k in rule else "⚠ outside the rule"
             self.permitted.setText(f"permitted for {dataset.name}: {rule.text}   {ok}")
+
+    @staticmethod
+    def _metric_texts(config: ExperimentConfig, dataset: Dataset | None) -> tuple[str, str]:
+        """(note under the metric, ⚠ text or ``""``) for ``config`` on ``dataset``."""
+        metric = config.distance.metric
+        if dataset is None:
+            if is_auto(metric):
+                return (
+                    "the metric of the dataset type: "
+                    + " · ".join(
+                        f"{kind.value} → {config.distance.type_metrics.for_type(kind.value).name}"
+                        for kind in DatasetType
+                    ),
+                    "",
+                )
+            return METRICS.info(metric.name).summary, ""
+        try:
+            choice = choose_metric(config, dataset)
+        except ERDRError as error:
+            return "", str(error)
+        summary = METRICS.info(choice.name).summary
+        if choice.automatic:
+            summary = f"{dataset.name} is a {choice.dataset_type.value} dataset → {choice.name}: "
+            summary += METRICS.info(choice.name).summary
+        return summary, choice.note
+
+    def _mark_metrics(self, dataset: Dataset | None) -> None:
+        """Disable the metrics that are not defined on the dataset's features (ADR-022)."""
+        model = self.metric_box.model()
+        if not isinstance(model, QStandardItemModel):
+            return
+        for row in range(self.metric_box.count()):
+            name = str(self.metric_box.itemData(row))
+            if name == AUTO_METRIC:
+                continue
+            fit = suitability(name, dataset.dataset_type) if dataset else Suitability.SUITED
+            domain = traits_of(METRICS.get(name)).domain
+            item = model.item(row)
+            item.setEnabled(fit is not Suitability.UNSUITED)
+            reason = {
+                Suitability.SUITED: "",
+                Suitability.PARTIAL: f" — sees only the {domain} features of this dataset",
+                Suitability.UNSUITED: f" — not defined here: the dataset has no {domain} features",
+            }[fit]
+            item.setToolTip(METRICS.info(name).summary + reason)
 
     def apply_preset(self, name: PresetName | str) -> None:
         """Apply the readings of a preset (the other settings stay)."""

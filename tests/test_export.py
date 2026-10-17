@@ -147,3 +147,17 @@ def test_settings_name_the_reading(heart270):
     run = run_experiment(preset("closest"), heart270)
     settings = dict(run_settings(run))
     assert settings["Reading"] == "A=1 B=2 C=1 · z: own class"
+
+
+def test_settings_name_the_dataset_type_and_flag_a_partial_metric(heart270):
+    from erdr.config import ExperimentConfig, plugin
+    from erdr.config.models import DistanceConfig
+
+    settings = dict(run_settings(run_experiment(dataset=heart270)))
+    assert settings["Dataset type"] == "heterogeneous"
+    assert settings["Metric · features"] == "zhuravlev (auto · heterogeneous dataset) · auto"
+    assert "⚠ Metric" not in settings
+    euclidean = ExperimentConfig(distance=DistanceConfig(metric=plugin("euclidean")))
+    settings = dict(run_settings(run_experiment(euclidean, heart270)))
+    assert settings["Metric · features"] == "euclidean · auto"
+    assert "7 nominal feature(s) do not count" in settings["⚠ Metric"]

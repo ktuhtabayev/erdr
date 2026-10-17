@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
+from erdr.core.arrays import FloatArray
 from erdr.core.registry import Registry
 from erdr.data.schema import Dataset, FeatureType, Label, as_labels
 from erdr.errors import DatasetError
@@ -394,6 +395,21 @@ def _meta_header(row: Sequence[str]) -> tuple[int, int, int] | None:
     return m, n, c
 
 
+def _object_row(row: Sequence[str], i: int, X: FloatArray, labels: list[Label], file: str) -> str:
+    """Read object row ``i`` into ``X[i]`` and ``labels``; the problem found, or ``""``."""
+    n = X.shape[1]
+    cells = [cell.strip() for cell in row]
+    if len(cells) != n + 1:
+        return f"{file}: object row {i + 1} has {len(cells)} values, expected {n + 1}"
+    for j, cell in enumerate(cells[:n]):
+        value = _number(cell)
+        if value is None or not math.isfinite(value):
+            return f"{file}: object row {i + 1}, feature {j + 1}: {cell!r} is not a number"
+        X[i, j] = value
+    labels.append(_label(cells[n]))
+    return ""
+
+
 def load_extended_layout(path: Path, options: LoadOptions) -> Dataset:
     """The author's extended layout (format ``extended``, alias ``template-extended``).
 
@@ -402,35 +418,32 @@ def load_extended_layout(path: Path, options: LoadOptions) -> Dataset:
     column. ``.dat`` files are whitespace-separated and may use decimal commas; other files are
     comma-separated.
     """
-    rows = list(_dat_rows(path) if path.suffix.lower() == ".dat" else _csv_rows(path))
-    if not rows:
+    # rows are parsed as they are read, so a large file (TCGA_LUAD: 589 × 57,772 values) never
+    # holds all its cells as text; the row count is still checked before any row's content
+    rows = _dat_rows(path) if path.suffix.lower() == ".dat" else _csv_rows(path)
+    first = next(rows, None)
+    if first is None:
         raise DatasetError(f"{path.name}: the file is empty")
-    header = _meta_header(rows[0])
+    header = _meta_header(first)
     if header is None:
-        raise DatasetError(f"{path.name}: the first row must be 'm, n, c', got {rows[0]}")
+        raise DatasetError(f"{path.name}: the first row must be 'm, n, c', got {first}")
     m, n, c = header
-    if len(rows) != m + 2:
-        raise DatasetError(
-            f"{path.name}: the header says m = {m}, so {m + 2} rows are expected "
-            f"(header, {m} objects, type flags); the file has {len(rows)} non-empty rows"
-        )
     X = np.empty((m, n))
     labels: list[Label] = []
-    for i, row in enumerate(rows[1 : m + 1]):
-        cells = [cell.strip() for cell in row]
-        if len(cells) != n + 1:
-            raise DatasetError(
-                f"{path.name}: object row {i + 1} has {len(cells)} values, expected {n + 1}"
-            )
-        for j, cell in enumerate(cells[:n]):
-            value = _number(cell)
-            if value is None or not math.isfinite(value):
-                raise DatasetError(
-                    f"{path.name}: object row {i + 1}, feature {j + 1}: {cell!r} is not a number"
-                )
-            X[i, j] = value
-        labels.append(_label(cells[n]))
-    flags = [cell for cell in rows[-1] if cell.strip()]
+    count, problem, last = 1, "", first
+    for row in rows:
+        count += 1
+        if count > 2 and not problem and len(labels) < m:
+            problem = _object_row(last, len(labels), X, labels, path.name)
+        last = row
+    if count != m + 2:
+        raise DatasetError(
+            f"{path.name}: the header says m = {m}, so {m + 2} rows are expected "
+            f"(header, {m} objects, type flags); the file has {count} non-empty rows"
+        )
+    if problem:
+        raise DatasetError(problem)
+    flags = [cell for cell in last if cell.strip()]
     if len(flags) == n + 1:
         flags = flags[:n]  # some template files put a placeholder under the class column
     if len(flags) != n:

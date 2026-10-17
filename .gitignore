@@ -5,6 +5,14 @@
 resources/Article/
 
 # =========================
+# Datasets kept on this computer only (ADR-021)
+# TCGA_LUAD (589, 57772, 2) is 391 MB per file — over GitHub's 100 MB limit. Its ReadMe.txt
+# (tracked) says where to download it; erdr catalogues it whenever the files are present.
+# =========================
+datasets/Quantitative/TCGA_LUAD/*.csv
+datasets/Quantitative/TCGA_LUAD/*.dat
+
+# =========================
 # Python
 # =========================
 __pycache__/

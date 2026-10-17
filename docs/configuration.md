@@ -30,7 +30,11 @@ dataset:
 preprocessing:
   normalizer: {name: minmax, params: {}}
 distance:
-  metric: {name: zhuravlev, params: {}}
+  metric: {name: auto, params: {}}     # auto = the metric of the dataset type, or a metric
+  type_metrics:                        # the metric auto takes for each dataset type (ADR-022)
+    quantitative: {name: manhattan, params: {}}
+    nominal: {name: hamming, params: {}}
+    heterogeneous: {name: zhuravlev, params: {}}
   features: auto          # auto | all | quantitative | nominal | [feature names]
   decimals: 10
 erdr:
@@ -56,12 +60,34 @@ A plug-in may be given by name alone: `normalizer: rank`.
 `max-abs`, `decimal-scaling`, `rank`, `unit-length`. Every normalizer is fitted on the objects of
 E₀ and maps a feature without spread to 0; nominal codes are never changed.
 
-`distance.metric` — `zhuravlev` (default; aliases `zhuravlyov`, `juravlev`), `weighted-zhuravlev`
-(`quantitative_weight`, `nominal_weight`, `feature_weights`), `heom`, `gower`, `manhattan`,
-`euclidean`, `chebyshev`, `minkowski` (`p ≥ 1`), `canberra`, `cosine`, `mahalanobis`, `hamming`.
+`distance.metric` — `auto` (default: the metric of the dataset type, below), `zhuravlev`
+(aliases `zhuravlyov`, `juravlev`), `weighted-zhuravlev` (`quantitative_weight`,
+`nominal_weight`, `feature_weights`), `heom`, `gower`, `manhattan`, `euclidean`, `chebyshev`,
+`minkowski` (`p ≥ 1`), `canberra`, `cosine`, `mahalanobis`, `hamming`.
 `distance.features: auto` gives every metric its domain — all features for heterogeneous metrics,
 set I for Euclidean and the like, set J for Hamming; an explicit selection outside the domain is
 an error that names the features.
+
+**The metric follows the dataset type** ([Datasets](datasets.md#dataset-types), ADR-022). With
+`metric: auto` the metric comes from `distance.type_metrics` by the type of the dataset —
+quantitative → `manhattan`, nominal → `hamming`, heterogeneous → `zhuravlev`. These are the
+Zhuravlev metric and its two parts, so `auto` gives the Zhuravlev distances bit for bit on every
+dataset (the literal default). Each entry must suit its type: a quantitative or heterogeneous
+metric for quantitative datasets, Hamming or a heterogeneous metric for nominal ones, a
+heterogeneous metric for heterogeneous ones (`erdr config check` verifies it); an entry may carry
+parameters:
+
+```yaml
+distance:
+  metric: auto
+  type_metrics:
+    quantitative: {name: minkowski, params: {p: 3}}   # changes the results on quantitative data
+```
+
+A metric named in `metric` is used for every dataset it is defined on: on a dataset without its
+feature type (Euclidean on a nominal dataset) the run stops with an error that lists the metrics
+that suit; a single-type metric on a heterogeneous dataset runs on its part of the features and is
+flagged ⚠.
 
 ## Steps 1–6
 

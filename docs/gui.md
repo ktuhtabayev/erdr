@@ -49,9 +49,13 @@ their light fill and dark ink in the dark theme.
 ## Dataset
 
 Choose a dataset of the project's folder or a built-in one, or open any file (extended layout,
-CSV, Excel, the ERDR workbook). The summary shows the feature types and the classes in their
-colours, the permitted k, and a bar of the class sizes; the table's headers show each feature's
-type, its last row the type flags, and the class column every object's class.
+CSV, Excel, the ERDR workbook). The chooser lists the datasets under their type folders —
+*Quantitative/*, *Nominal/*, *Heterogeneous/*, then *Built-in · …* by type — with the size of a
+large file (TCGA_LUAD, 401 MB). The summary shows the dataset type (in the colour of its
+features), the feature types and the classes in their colours, the metric the configuration runs
+on it with the metrics that suit its type, the permitted k, a ⚠ line when a run needs more memory
+than is free, and a bar of the class sizes; the table's headers show each feature's type, its last
+row the type flags, and the class column every object's class.
 
 ![Dataset](images/gui/dataset.png)
 
@@ -63,6 +67,13 @@ row shows which preset the settings match — `literal`, `closest` or `custom` �
 *Literal preset*, *Closest preset* and *Reset* buttons; a ⚠ box at the top names every switch that
 differs from the literal article text, and such a switch — and the preset badge — turns orange.
 **File → Open configuration… / Save configuration as…** read and write configuration files.
+
+The metric follows the dataset type (ADR-022): *auto — the metric of the dataset type* comes first,
+and under it one box per type (*auto · quantitative*, *auto · nominal*, *auto · heterogeneous*)
+offers the metrics that suit that type. With a dataset loaded, the metrics not defined on its
+features are disabled (the tooltip says why), the note under the metric names the one `auto`
+chooses, and a single-type metric on heterogeneous data shows the ⚠ box. The Run page's header
+shows the metric that will run.
 
 ![Configure](images/gui/configure.png)
 

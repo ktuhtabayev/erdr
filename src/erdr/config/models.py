@@ -3,7 +3,9 @@
 One :class:`ExperimentConfig` describes an ERDR run completely. Unknown keys are errors and
 instances are immutable. The defaults are the **literal** article reading on the workbook's
 settings (Zhuravlev metric, min–max scaling, k = 3, ε = 0.001, A = B = C = 1), which reproduces
-the ERDR workbook exactly (ADR-002); :mod:`.presets` holds the named presets.
+the ERDR workbook exactly (ADR-002); :mod:`.presets` holds the named presets. The metric is
+``auto``: the Zhuravlev metric on heterogeneous data and, on single-type data, its part that
+the data have — the same distances (ADR-022).
 
 Pluggable components are :class:`PluginSpec` values (registry name + parameters). Their
 parameters are validated by the component's own parameter type when they are resolved.
@@ -81,11 +83,40 @@ class PreprocessingConfig(ConfigModel):
     """Fractional-linear (min–max) transform of the quantitative features by default."""
 
 
+AUTO_METRIC = "auto"
+"""``distance.metric: auto`` — the metric of the dataset's type (``distance.type_metrics``)."""
+
+
+class TypeMetricsConfig(ConfigModel):
+    """The metric ``distance.metric: auto`` chooses for each dataset type (ADR-022).
+
+    The defaults are the Zhuravlev metric of the article (§3) and its two parts: on a dataset
+    without nominal features it is the Manhattan distance of the unified values, on a dataset
+    without quantitative features the Hamming distance — bit for bit, so ``auto`` gives the
+    literal results on every dataset.
+    """
+
+    quantitative: PluginSpec = Field(default_factory=lambda: plugin("manhattan"))
+    """For datasets whose features are all quantitative: a quantitative or heterogeneous metric."""
+    nominal: PluginSpec = Field(default_factory=lambda: plugin("hamming"))
+    """For datasets whose features are all nominal: a nominal or heterogeneous metric."""
+    heterogeneous: PluginSpec = Field(default_factory=lambda: plugin("zhuravlev"))
+    """For datasets with both feature types: a heterogeneous metric."""
+
+    def for_type(self, dataset_type: str) -> PluginSpec:
+        """The metric for ``quantitative``, ``nominal`` or ``heterogeneous`` datasets."""
+        spec: PluginSpec = getattr(self, str(dataset_type))
+        return spec
+
+
 class DistanceConfig(ConfigModel):
     """Step 0 · the metric ρ and the features it sees."""
 
-    metric: PluginSpec = Field(default_factory=lambda: plugin("zhuravlev"))
-    """The Zhuravlev metric by default (article §3)."""
+    metric: PluginSpec = Field(default_factory=lambda: plugin(AUTO_METRIC))
+    """``auto`` (default): the metric of the dataset's type from ``type_metrics`` — the Zhuravlev
+    metric of the article (§3) on heterogeneous data; or a metric by name for every dataset."""
+    type_metrics: TypeMetricsConfig = Field(default_factory=TypeMetricsConfig)
+    """The metric of each dataset type when ``metric`` is ``auto``."""
     features: Literal["auto", "all", "quantitative", "nominal"] | tuple[str, ...] = "auto"
     """``auto`` (the metric's domain: all features for heterogeneous metrics, set I for Euclidean
     and the like, set J for Hamming), ``all``, ``quantitative``, ``nominal`` or feature names."""

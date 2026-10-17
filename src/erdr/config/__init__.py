@@ -12,6 +12,7 @@ from erdr.config.io import (
     to_data,
 )
 from erdr.config.models import (
+    AUTO_METRIC,
     ConfigModel,
     DatasetConfig,
     DistanceConfig,
@@ -21,6 +22,7 @@ from erdr.config.models import (
     PluginSpec,
     PreprocessingConfig,
     ReadingsConfig,
+    TypeMetricsConfig,
     plugin,
 )
 from erdr.config.presets import (
@@ -32,6 +34,7 @@ from erdr.config.presets import (
 )
 
 __all__ = [
+    "AUTO_METRIC",
     "ConfigFormat",
     "ConfigModel",
     "DatasetConfig",
@@ -44,6 +47,7 @@ __all__ = [
     "PresetName",
     "ReadingNote",
     "ReadingsConfig",
+    "TypeMetricsConfig",
     "config_hash",
     "dumps",
     "format_for",

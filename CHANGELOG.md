@@ -5,6 +5,46 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The datasets folder by type (ADR-021): `datasets/Quantitative/` (Cancer (589, 44, 2),
+  Hypertension (147, 29, 2), Spambase (4204, 57, 2), TCGA_LUAD (589, 57772, 2)), `Nominal/`
+  (Molecular-Biology (106, 57, 2), (100, 50, 2), (100, 10, 2), Uzb-Kor (100, 24, 2)) and
+  `Heterogeneous/` (German (1000, 20, 2), Heart-Disease (270, 13, 2), Ionosfera (350, 33, 2)),
+  each with the author's `ReadMe.txt`. `DatasetType` (quantitative, nominal, heterogeneous) comes
+  from the feature flags; the catalogue knows each dataset's type folder and family and groups them.
+- `erdr data check` checks that the feature types match the type folder and that every file is
+  written in the author's conventions (line by line, any size), and takes dataset ids to check
+  only those; `erdr data list` groups the datasets by type with each type's metric; `erdr data
+  info` names the type, the metric, the metrics that suit and the memory of a run (`-c FILE` for
+  a configuration's metric).
+- The metric follows the dataset type (ADR-022): `distance.metric: auto` (the default) takes the
+  metric of the type from `distance.type_metrics` — quantitative → Manhattan, nominal → Hamming,
+  heterogeneous → Zhuravlev, the Zhuravlev distances bit for bit on every type. A metric not
+  defined on the dataset's features is refused with the metrics that suit; a single-type metric
+  on heterogeneous data is flagged ⚠ in the CLI, the GUI and the exports. Runs record the metric
+  chosen (`ExperimentResult.metric_choice`); the exports name the dataset type and the metric.
+- Every dataset of the folder except TCGA_LUAD is built in (byte-for-byte `.csv` copies with their
+  type), so the Windows executable has them.
+- GUI: the dataset chooser lists the type folders as headings and the built-in datasets by type;
+  the summary shows the dataset type, the metric and the metrics that suit; the Configure page
+  offers *auto* with one metric per type and disables the metrics the loaded dataset cannot take;
+  the Run page shows the metric that will run.
+- A memory estimate of a run (8·(3·m·n + 4·m²) bytes) with a warning in `erdr data info`, `erdr
+  run` and the GUI when it is more than the free memory.
+
+### Changed
+
+- The new datasets' `.dat` files were rewritten in the conventions of `default.dat` (LF, every
+  value as a decimal); the data are unchanged. Heart-Disease (270, 13, 2) moved, byte for byte,
+  to `datasets/Heterogeneous/Heart-Disease/`.
+- The extended-layout writer never writes an exponent (`0.00003`, not `3e-05`), as the author's
+  files do; the loader parses each row as it reads it, so a 391 MB file loads without holding
+  its text.
+- The shipped configurations say `metric: auto` with the `type_metrics` block (the same results).
+- TCGA_LUAD's data files are kept out of Git (391 MB per file, over GitHub's limit); its
+  `ReadMe.txt` says where to download it.
+
 ## [0.4.1] — 2026-10-11 — the explorer's owner
 
 ### Fixed
