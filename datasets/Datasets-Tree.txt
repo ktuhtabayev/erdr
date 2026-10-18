@@ -1,6 +1,6 @@
 |
 |   * alomatlar soniga sinf ustuni kirmaydi (fayl nomidagi 2-son bilan bir xil).
-|   * yangilangan: 17.10.2026.
+|   * yangilangan: 18.10.2026.
 |   * papkalar: Quantitative/ (faqat miqdoriy), Nominal/ (faqat nominal),
 |     Heterogeneous/ (aralash); alomat turlari papkaga mos bo'lishi shart.
 |   * metrika dataset turiga qarab tanlanadi (auto): miqdoriy - manhattan,
@@ -82,6 +82,15 @@
                      (Spambase/Spambase (4204, 57, 2); 4595 ta obyektli versiyasi
                       17.10.2026 da o'chirildi: sinflar 0/1, 391 ta takror qator)
 |
+|-- breast_cancer ---|
+                     |- obyektlar soni: 569 ta
+                     |- alomatlar soni: 30 ta
+                        - miqdoriy: 30 ta
+                        - nominal : 0 ta
+                        - sinflar : 2 ta
+                     (Breast-Cancer-Wisconsin/Breast-Cancer-Wisconsin (569, 30, 2);
+                      UCI WDBC, 18.10.2026 da qo'shildi)
+|
 |
 ###############################
 #                             #
@@ -108,6 +117,15 @@
                      (Molecular-Biology/Molecular-Biology (106, 57, 2); shuningdek
                       (100, 10, 2) va (100, 50, 2) - 51-53, 104-106-obyektlarsiz,
                       dastlabki 10 va 50 ta alomat)
+|
+|---- tic_tac_toe ---|
+                     |- obyektlar soni: 958 ta
+                     |- alomatlar soni: 9 ta
+                        - miqdoriy: 0 ta
+                        - nominal : 9 ta
+                        - sinflar : 2 ta
+                     (Tic-Tac-Toe/Tic-Tac-Toe (958, 9, 2); b, o, x -> 1, 2, 3;
+                      18.10.2026 da qo'shildi)
 |
 |
 ###############################
@@ -143,6 +161,14 @@
                         - sinflar : 2 ta
                      (Ionosfera/Ionosfera (350, 33, 2); 1-alomat nominal bo'lgani uchun
                       17.10.2026 da miqdoriylardan shu yerga ko'chirildi)
+|
+|-- heart_failure ---|
+                     |- obyektlar soni: 299 ta
+                     |- alomatlar soni: 12 ta
+                        - miqdoriy: 7 ta
+                        - nominal : 5 ta
+                        - sinflar : 2 ta
+                     (Heart-Failure/Heart-Failure (299, 12, 2); 18.10.2026 da qo'shildi)
 |
 |
 |

@@ -51,11 +51,14 @@ def test_dataset_type_of_the_features():
 @pytest.mark.parametrize(
     ("name", "expected"),
     [
+        ("breast-cancer-wisconsin-569", Q),
         ("cancer-589", Q),
         ("hypertension-147", Q),
         ("molecular-biology-106", N),
+        ("tic-tac-toe-958", N),
         ("uzb-kor-100", N),
         ("german-1000", H),
+        ("heart-failure-299", H),
         ("ionosfera-350", H),
         ("heart-disease-270", H),
     ],
@@ -169,7 +172,15 @@ def test_auto_takes_the_metric_of_the_type(types: str, metric: str):
 
 @pytest.mark.parametrize(
     "name",
-    ["cancer-589", "hypertension-147", "molecular-biology-106", "uzb-kor-100", "ionosfera-350"],
+    [
+        "breast-cancer-wisconsin-569",
+        "cancer-589",
+        "hypertension-147",
+        "molecular-biology-106",
+        "tic-tac-toe-958",
+        "uzb-kor-100",
+        "ionosfera-350",
+    ],
 )
 def test_auto_gives_the_zhuravlev_results_bit_for_bit(name: str):
     """On every dataset type ``auto`` is the Zhuravlev metric — the literal default is kept."""

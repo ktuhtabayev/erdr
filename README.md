@@ -37,7 +37,7 @@ Step 5  |L| > 1 → g(Sⱼ) − 1 for Sⱼ ∈ L;  g(Sⱼ) = 1 → Sⱼ to D    
 | Part | Content | State |
 |---|---|---|
 | Core | Step 0 (8 normalizers, 12 metrics), Steps 1–6, the readings A, B, C and z, the 17 cases, Steps 1–5 as hyperspheres | ✓ |
-| Data | extended `.csv`/`.dat` layout (read and written byte for byte), CSV/Excel tables, the ERDR workbook, Parquet; the dataset folder by type — Quantitative, Nominal, Heterogeneous — with 11 datasets, every one also built in except TCGA_LUAD ([Datasets](docs/datasets.md)) | ✓ |
+| Data | extended `.csv`/`.dat` layout (read and written byte for byte), CSV/Excel tables, the ERDR workbook, Parquet; the dataset folder by type — Quantitative, Nominal, Heterogeneous — with 14 datasets, every one also built in except TCGA_LUAD ([Datasets](docs/datasets.md)) | ✓ |
 | Metrics | the metric follows the dataset type (`auto`): Zhuravlev on heterogeneous data, its Manhattan or Hamming part on quantitative or nominal data — the same distances; a metric the dataset lacks the features for is refused, a partial one flagged | ✓ |
 | Configuration | typed (pydantic), YAML/TOML/JSON, presets `literal` and `closest`, hashing | ✓ |
 | Services | runner, repeatable run folders, readings comparison, k sweeps, workbook validation | ✓ |
@@ -136,6 +136,6 @@ The article is in preparation; its text is not part of the public repository.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Heart-Disease, German, Spambase and Molecular-Biology come from the
-UCI Machine Learning Repository (CC BY 4.0); the sources of the other datasets are in their
-`ReadMe.txt` files.
+MIT — see [LICENSE](LICENSE). Heart-Disease, German, Spambase, Molecular-Biology,
+Breast-Cancer-Wisconsin, Tic-Tac-Toe and Heart-Failure come from the UCI Machine Learning
+Repository (CC BY 4.0); the sources of the other datasets are in their `ReadMe.txt` files.
