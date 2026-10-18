@@ -5,6 +5,19 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Three datasets of the UCI Machine Learning Repository (CC BY 4.0), one of each type, two classes
+  each (ADR-023): `Quantitative/Breast-Cancer-Wisconsin (569, 30, 2)` (WDBC), `Nominal/Tic-Tac-Toe
+  (958, 9, 2)` (Tic-Tac-Toe Endgame) and `Heterogeneous/Heart-Failure (299, 12, 2)` (Heart Failure
+  Clinical Records) — the values unchanged, the layout that of `default.csv`/`default.dat`, each
+  with its `ReadMe.txt` and its entry in `Datasets-Tree.txt`; built in as
+  `breast-cancer-wisconsin-569`, `tic-tac-toe-958` and `heart-failure-299`.
+
+### Changed
+
+- `erdr data list` and `erdr data check` widen the dataset id column to the longest id.
+
 ## [0.5.0] — 2026-10-17 — datasets by type
 
 ### Added

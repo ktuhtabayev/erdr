@@ -76,6 +76,16 @@ DATASETS.add(
 _Q, _N, _H = DatasetType.QUANTITATIVE, DatasetType.NOMINAL, DatasetType.HETEROGENEOUS
 for _name, _file, _type, _description, _summary in (
     (
+        "breast-cancer-wisconsin-569",
+        "Breast-Cancer-Wisconsin (569, 30, 2).csv",
+        _Q,
+        (
+            "Breast Cancer Wisconsin (Diagnostic), UCI: 30 cell-nucleus features; "
+            "K1 = benign (357), K2 = malignant (212)"
+        ),
+        "Breast-Cancer-Wisconsin (569, 30, 2) — quantitative, UCI",
+    ),
+    (
         "cancer-589",
         "Cancer (589, 44, 2).csv",
         _Q,
@@ -127,6 +137,16 @@ for _name, _file, _type, _description, _summary in (
         "Molecular-Biology (100, 50, 2) — nominal",
     ),
     (
+        "tic-tac-toe-958",
+        "Tic-Tac-Toe (958, 9, 2).csv",
+        _N,
+        (
+            "Tic-Tac-Toe Endgame, UCI: 9 squares coded b, o, x → 1, 2, 3; "
+            "K1 = x does not win (332), K2 = x wins (626)"
+        ),
+        "Tic-Tac-Toe (958, 9, 2) — nominal, UCI",
+    ),
+    (
         "uzb-kor-100",
         "Uzb-Kor (100, 24, 2).csv",
         _N,
@@ -145,6 +165,16 @@ for _name, _file, _type, _description, _summary in (
             "K2 = bad (300)"
         ),
         "German (1000, 20, 2) — heterogeneous, UCI",
+    ),
+    (
+        "heart-failure-299",
+        "Heart-Failure (299, 12, 2).csv",
+        _H,
+        (
+            "Heart Failure Clinical Records, UCI: 7 quantitative + 5 nominal; "
+            "K1 = survived (203), K2 = died (96)"
+        ),
+        "Heart-Failure (299, 12, 2) — heterogeneous, UCI",
     ),
     (
         "ionosfera-350",

@@ -231,14 +231,20 @@ def test_write_extended(tmp_path: Path, default_dataset: Dataset):
 
 
 KEPT_IN_GIT = {
-    "Quantitative": ["cancer-589", "hypertension-147", "spambase-4204"],
+    "Quantitative": [
+        "breast-cancer-wisconsin-569",
+        "cancer-589",
+        "hypertension-147",
+        "spambase-4204",
+    ],
     "Nominal": [
         "molecular-biology-100-10",
         "molecular-biology-100-50",
         "molecular-biology-106",
+        "tic-tac-toe-958",
         "uzb-kor-100",
     ],
-    "Heterogeneous": ["german-1000", "heart-disease-270", "ionosfera-350"],
+    "Heterogeneous": ["german-1000", "heart-disease-270", "heart-failure-299", "ionosfera-350"],
 }
 """The datasets of the type folders that are kept in Git (ADR-021)."""
 

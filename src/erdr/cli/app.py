@@ -104,6 +104,10 @@ data_app = typer.Typer(
 )
 LARGE_FILE = 50 * 2**20
 """Dataset files above this size show their size in ``erdr data list``."""
+ID_WIDTH = 26
+"""Least width of the id column of ``erdr data list`` and ``check`` (longer ids widen it)."""
+NAME_WIDTH = 34
+"""Least width of the name column of ``erdr data list`` (longer names widen it)."""
 TYPE_RULES = {
     DatasetType.QUANTITATIVE: "every feature quantitative",
     DatasetType.NOMINAL: "every feature nominal",
@@ -277,6 +281,9 @@ def data_list() -> None:
     """List the datasets of the project's folder, the built-in datasets and the file formats."""
     catalog = project_catalog()
     metrics = ExperimentConfig().distance.type_metrics
+    ids = [info.name for info in DATASETS] + [entry.id for entry in catalog or ()]
+    width = max([ID_WIDTH, *map(len, ids)])
+    names = max([NAME_WIDTH, *(len(entry.name) for entry in catalog or ())])
     if catalog is not None:
         typer.echo(f"datasets folder: {catalog.root}")
         for title, entries in catalog.groups():
@@ -292,7 +299,7 @@ def data_list() -> None:
                 shape = "({}, {}, {})".format(*entry.shape) if entry.shape else "?"
                 size = f"  {megabytes(entry.size)}" if entry.size > LARGE_FILE else ""
                 typer.echo(
-                    f"  {entry.id:26s} {entry.name:34s} {shape:16s} "
+                    f"  {entry.id:{width}s} {entry.name:{names}s} {shape:16s} "
                     f"{', '.join(entry.formats)}{size}"
                 )
     else:
@@ -300,7 +307,7 @@ def data_list() -> None:
     typer.echo("built-in datasets:")
     for info in DATASETS:
         kind = info.obj.dataset_type.value
-        typer.echo(f"  {info.name:26s} {kind:14s} {info.summary}")
+        typer.echo(f"  {info.name:{width}s} {kind:14s} {info.summary}")
     typer.echo("file formats: " + ", ".join(LOADERS.names()))
 
 
@@ -329,11 +336,12 @@ def data_check(
             raise typer.Exit(EXIT_USAGE)
         entries = [entry for entry in found.values() if entry is not None]
     failed = False
+    width = max([ID_WIDTH, *(len(entry.id) for entry in entries)])
     for check in (check_entry(entry) for entry in entries):
         mark = "✓" if check.passed else "✗"
         digest = check.content_hash[:12] if check.content_hash else "—"
         kind = check.dataset_type.value if check.dataset_type else "—"
-        typer.echo(f"{mark} {check.entry.id:26s} {check.shape}  {kind:14s} {digest}")
+        typer.echo(f"{mark} {check.entry.id:{width}s} {check.shape}  {kind:14s} {digest}")
         for ext, digest in check.sha256.items():
             typer.echo(f"    {ext}  sha256 {digest}")
         for problem in check.problems:

@@ -198,7 +198,8 @@ def test_datasets_by_type_and_their_metric(tmp_path: Path):
     assert "Quantitative/  every feature quantitative · metric (auto): manhattan" in out
     assert "Nominal/  every feature nominal · metric (auto): hamming" in out
     assert "Heterogeneous/  quantitative and nominal features · metric (auto): zhuravlev" in out
-    assert "uzb-kor-100                nominal" in out  # the built-in copies with their type
+    assert "uzb-kor-100                 nominal" in out  # the built-in copies with their type
+    assert "breast-cancer-wisconsin-569 quantitative" in out  # the longest id widens the column
     code, out = invoke("data", "info", "uzb-kor-100")
     assert code == 0
     assert "type          nominal — every feature nominal" in out

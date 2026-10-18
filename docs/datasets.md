@@ -8,16 +8,19 @@ The folder is organized by **dataset type** — the types of the features (ADR-0
 datasets/
   default.dat, default.csv              Heart-Disease (7, 13, 2) — the default experiment
   Quantitative/                         every feature quantitative (set J empty)
+    Breast-Cancer-Wisconsin/Breast-Cancer-Wisconsin (569, 30, 2)
     Cancer/Cancer (589, 44, 2)
     Hypertension/Hypertension (147, 29, 2)
     Spambase/Spambase (4204, 57, 2)
     TCGA_LUAD/TCGA_LUAD (589, 57772, 2)   on the author's computer only (see below)
   Nominal/                              every feature nominal (set I empty)
     Molecular-Biology/Molecular-Biology (106, 57, 2), (100, 50, 2), (100, 10, 2)
+    Tic-Tac-Toe/Tic-Tac-Toe (958, 9, 2)
     Uzb-Kor/Uzb-Kor (100, 24, 2)
   Heterogeneous/                        quantitative and nominal features
     German/German (1000, 20, 2)
     Heart-Disease/Heart-Disease (270, 13, 2)   the full Statlog (Heart) sample
+    Heart-Failure/Heart-Failure (299, 12, 2)
     Ionosfera/Ionosfera (350, 33, 2)
   <Type>/<Family>/<Name (m, n, c)>.dat|.csv   further datasets — just drop them in
   Datasets-Tree.txt, */ReadMe.txt       the author's notes (features, classes, sources)
@@ -66,6 +69,7 @@ The default reading (k = 3, `auto`) on every dataset of the folder:
 
 | Dataset | Type | I / J | Classes (K1 / K2) | k ≤ | \|D\| | Source |
 |---|---|---|---|---|---|---|
+| Breast-Cancer-Wisconsin (569, 30, 2) | quantitative | 30 / 0 | benign 357 / malignant 212 | 421 | 540 | UCI Breast Cancer Wisconsin (Diagnostic), without its ID column |
 | Cancer (589, 44, 2) | quantitative | 44 / 0 | 530 / 59 | 115 | 583 | not recorded (perhaps 44 genes of TCGA_LUAD) |
 | Hypertension (147, 29, 2) | quantitative | 29 / 0 | healthy 111 / ill 36 | 69 | 137 | N. A. Ignatev's monograph |
 | Spambase (4204, 57, 2) | quantitative | 57 / 0 | not spam 2528 / spam 1676 | 3349 | 3105 | UCI Spambase without its 391 repeated rows |
@@ -73,9 +77,11 @@ The default reading (k = 3, `auto`) on every dataset of the folder:
 | Molecular-Biology (106, 57, 2) | nominal | 0 / 57 | promoter 53 / not 53 | 103 | 86 | UCI promoter gene sequences, A C G T coded 1–4 |
 | Molecular-Biology (100, 50, 2) | nominal | 0 / 50 | 50 / 50 | 97 | 72 | the 106 without S₅₁–S₅₃, S₁₀₄–S₁₀₆; first 50 positions |
 | Molecular-Biology (100, 10, 2) | nominal | 0 / 10 | 50 / 50 | 97 | 52 | the same objects, first 10 positions |
+| Tic-Tac-Toe (958, 9, 2) | nominal | 0 / 9 | x does not win 332 / x wins 626 | 661 | 321 | UCI Tic-Tac-Toe Endgame, b o x coded 1–3 |
 | Uzb-Kor (100, 24, 2) | nominal | 0 / 24 | Uzbek 50 / Korean 50 | 97 | 65 | questionnaire, NUUz sociology department |
 | German (1000, 20, 2) | heterogeneous | 7 / 13 | good 700 / bad 300 | 597 | 696 | UCI Statlog (German Credit) |
 | Heart-Disease (270, 13, 2) | heterogeneous | 6 / 7 | absence 150 / presence 120 | 237 | 198 | UCI Statlog (Heart) |
+| Heart-Failure (299, 12, 2) | heterogeneous | 7 / 5 | survived 203 / died 96 | 189 | 198 | UCI Heart Failure Clinical Records |
 | Ionosfera (350, 33, 2) | heterogeneous | 32 / 1 | bad 125 / good 225 | 247 | 295 | Ionosphere (Kaggle), without repeated rows and constant columns |
 
 Notes from the review of the files (2026-10-17; the values are the author's, unchanged):
@@ -87,6 +93,14 @@ Notes from the review of the files (2026-10-17; the values are the author's, unc
 - Spambase (4204, 57, 2) is the UCI file of 4595 objects without its repeated rows (first
   occurrences, in order) and with the classes 0/1 renumbered 1/2; the 4595-object file and the
   DDoS files are no longer in the folder.
+
+Breast-Cancer-Wisconsin, Tic-Tac-Toe and Heart-Failure were added on 2026-10-18 from the UCI
+Machine Learning Repository (CC BY 4.0) — none has missing values, repeated rows or constant
+columns. Only their layout was changed (ADR-023): every value is the source's (each cell compared
+with it as an exact decimal), in the source's order; the class labels became 1/2 (B/M,
+negative/positive, DEATH_EVENT 0/1), Tic-Tac-Toe's b, o, x became 1, 2, 3 (alphabetically, as
+the loader codes text), and WDBC's ID column and Heart-Failure's header row — not features — were
+left out. Heart-Failure's x₁₂ (`time`) is the follow-up period, closely tied to the outcome.
 
 ### TCGA_LUAD stays on the author's computer
 
@@ -161,9 +175,9 @@ dataset of the folder except TCGA_LUAD (tested):
 | `heart-disease-7` | heterogeneous | Heart-Disease (7, 13, 2) — the default (copy of `default.csv`) |
 | `heart-disease-270` | heterogeneous | Heart-Disease (270, 13, 2) — Statlog (Heart), UCI, CC BY 4.0 |
 | `guide-example` | heterogeneous | ERDR-Guide (7, 4, 2) — the worked example of the step-by-step guide |
-| `cancer-589`, `hypertension-147`, `spambase-4204` | quantitative | the datasets of `Quantitative/` |
-| `molecular-biology-106`, `molecular-biology-100-50`, `molecular-biology-100-10`, `uzb-kor-100` | nominal | the datasets of `Nominal/` |
-| `german-1000`, `ionosfera-350` | heterogeneous | the datasets of `Heterogeneous/` |
+| `breast-cancer-wisconsin-569`, `cancer-589`, `hypertension-147`, `spambase-4204` | quantitative | the datasets of `Quantitative/` |
+| `molecular-biology-106`, `molecular-biology-100-50`, `molecular-biology-100-10`, `tic-tac-toe-958`, `uzb-kor-100` | nominal | the datasets of `Nominal/` |
+| `german-1000`, `heart-failure-299`, `ionosfera-350` | heterogeneous | the datasets of `Heterogeneous/` |
 
 Use them as `erdr run heart-disease-270` or `dataset.path: builtin:guide-example`; the GUI lists
 them by type.

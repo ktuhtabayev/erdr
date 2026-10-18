@@ -434,3 +434,36 @@ No numerical result of an existing dataset changes; `erdr validate` passes uncha
   *Distances* sheet.
 
 No numerical result changes.
+
+## ADR-023 — Three UCI datasets, one of each type, with their values unchanged (author)
+
+*Accepted, 2026-10-18.*
+
+**Author.** «Find one dataset for each type … do not change values of new dataset, just bring
+their format and styles into our default's … make sure their classes count only 2.»
+
+- **The choice.** Two-class datasets of the UCI Machine Learning Repository (CC BY 4.0) that are
+  not in the collection (nor listed in `Datasets-Tree.txt`), with no missing values, repeated rows,
+  conflicting labels or constant columns: Breast-Cancer-Wisconsin (569, 30, 2) — WDBC, quantitative;
+  Tic-Tac-Toe (958, 9, 2) — Tic-Tac-Toe Endgame, nominal; Heart-Failure (299, 12, 2) — Heart
+  Failure Clinical Records, heterogeneous (7 quantitative, 5 nominal 0/1 features). Statlog
+  (Australian Credit Approval) was set aside because its 37 incomplete cases were filled with the
+  mean or the mode — values that were never measured; Sonar (208, 60, 2) is an equally clean
+  quantitative alternative.
+- **Only the layout changes.** Each file is written by `write_extended` (the conventions of
+  `default.csv`/`default.dat`), in the source's order, and every cell was compared with the source
+  as an exact decimal. What the extended layout needs and the source did not have: the class
+  labels 1/2 (WDBC B → 1, M → 2; Tic-Tac-Toe negative → 1, positive → 2; DEATH_EVENT 0 → 1,
+  1 → 2 — the first label in the loader's order is K1), Tic-Tac-Toe's letters as codes in
+  alphabetical order (b → 1, o → 2, x → 3, as the loader codes text and as Molecular-Biology's
+  A C G T → 1–4); WDBC's patient ID column and Heart-Failure's header row are not features and
+  are left out. Each `ReadMe.txt` (the author's style, in Uzbek) records these steps, the
+  features and the source; `Datasets-Tree.txt` lists the three.
+- **Everywhere.** Like the other datasets of the folder (ADR-021) they are built in, byte-for-byte
+  copies of the `.csv` files (the package's datasets grow from 1.3 to 1.5 MB), and the tests
+  cover their type and `auto`'s Zhuravlev results bit for bit. `erdr data list` and `check`
+  widen their id column to the longest id (`breast-cancer-wisconsin-569`, 27 characters).
+- **To keep in mind.** Heart-Failure's x₁₂ (`time`, the follow-up period in days) is closely tied
+  to the outcome; WDBC's values have four significant digits.
+
+No numerical result of an existing dataset changes.
