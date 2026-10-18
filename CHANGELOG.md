@@ -5,19 +5,6 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-
-- Three datasets of the UCI Machine Learning Repository (CC BY 4.0), one of each type, two classes
-  each (ADR-023): `Quantitative/Breast-Cancer-Wisconsin (569, 30, 2)` (WDBC), `Nominal/Tic-Tac-Toe
-  (958, 9, 2)` (Tic-Tac-Toe Endgame) and `Heterogeneous/Heart-Failure (299, 12, 2)` (Heart Failure
-  Clinical Records) — the values unchanged, the layout that of `default.csv`/`default.dat`, each
-  with its `ReadMe.txt` and its entry in `Datasets-Tree.txt`; built in as
-  `breast-cancer-wisconsin-569`, `tic-tac-toe-958` and `heart-failure-299`.
-
-### Changed
-
-- `erdr data list` and `erdr data check` widen the dataset id column to the longest id.
-
 ## [0.5.0] — 2026-10-17 — datasets by type
 
 ### Added
@@ -41,6 +28,12 @@ and [Semantic Versioning](https://semver.org/).
   chosen (`ExperimentResult.metric_choice`); the exports name the dataset type and the metric.
 - Every dataset of the folder except TCGA_LUAD is built in (byte-for-byte `.csv` copies with their
   type), so the Windows executable has them.
+- Three datasets of the UCI Machine Learning Repository (CC BY 4.0), one of each type, two classes
+  each (ADR-023, added 2026-10-18): `Quantitative/Breast-Cancer-Wisconsin (569, 30, 2)` (WDBC),
+  `Nominal/Tic-Tac-Toe (958, 9, 2)` (Tic-Tac-Toe Endgame) and `Heterogeneous/Heart-Failure (299,
+  12, 2)` (Heart Failure Clinical Records) — the values unchanged, the layout that of
+  `default.csv`/`default.dat`, each with its `ReadMe.txt` and its entry in `Datasets-Tree.txt`;
+  built in as `breast-cancer-wisconsin-569`, `tic-tac-toe-958` and `heart-failure-299`.
 - GUI: the dataset chooser lists the type folders as headings and the built-in datasets by type;
   the summary shows the dataset type, the metric and the metrics that suit; the Configure page
   offers *auto* with one metric per type and disables the metrics the loaded dataset cannot take;
@@ -61,6 +54,7 @@ and [Semantic Versioning](https://semver.org/).
   `ReadMe.txt` says where to download it.
 - The author's dataset notes (`Datasets-Tree.txt`, the `ReadMe.txt` files) record the type
   folders, the rewritten `.dat` files and the datasets that left the folder.
+- `erdr data list` and `erdr data check` widen their id and name columns to the longest entry.
 
 ## [0.4.1] — 2026-10-11 — the explorer's owner
 
