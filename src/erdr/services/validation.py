@@ -1,12 +1,13 @@
 """Validation of the package against the ERDR workbook (``erdr validate``, ADR-001).
 
-The workbook ``ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx`` is the executable specification.
-Its inputs — the 7 selected objects, k, ε and the readings A, B, C — are read from the workbook
-itself, the engine runs, and every computed sheet is compared cell by cell with the cached cell
-values: the normalized data, the three distance matrices, the neighbour ranks, r, g, z, d and the
-enemy spheres, the queue with its tie criteria, every iteration of the trace and the counters,
-the routes of the objects, the 17 cases, all eight readings, the 270-object comparison with the
-article's Table 1, and finally the workbook's own *Validation* sheet.
+The workbook ``ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx`` is the executable
+specification. Its inputs — the 7 selected objects, k, ε and the readings A, B, C — are read
+from the workbook itself, the engine runs, and every computed sheet is compared cell by cell
+with the cached cell values: the normalized data, the three distance matrices, the neighbour
+ranks, r, g, z, d and the enemy spheres, the queue with its tie criteria, every iteration of
+the trace and the counters, the routes of the objects, the 17 cases, all eight readings, the
+270-object comparison with the article's Table 1, and finally the workbook's own *Validation*
+sheet.
 """
 
 from __future__ import annotations
@@ -56,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TOLERANCE = 1e-9
 """Absolute tolerance of numeric checks — the workbook's own (Validation sheet)."""
-WORKBOOK_NAME = "ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx"
+WORKBOOK_NAME = "ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx"
 """File name of the specification workbook."""
 
 _DECIDED = {"d": "d", "r": "r (equal d)", "index": "index (equal d and r)", "—": "— (last)"}
@@ -961,7 +962,7 @@ def validate_workbook(
     """Compare the package with every computed sheet of the ERDR workbook.
 
     Args:
-        path: The workbook (``ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx``).
+        path: The workbook (``ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx``).
         tolerance: Absolute tolerance of numeric checks.
         skip: Names of check groups to leave out (``table1`` skips the 270-object runs).
 

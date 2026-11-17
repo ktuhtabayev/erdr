@@ -8,7 +8,7 @@ density of its own class inside that radius.
 
 This project implements ERDR as a Python library, the `erdr` command line, a desktop application
 and a portable Windows executable. The Excel workbook
-`resources/Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` is the executable
+`resources/Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx` is the executable
 specification: `erdr validate` compares the package with every one of its computed sheets — 2,927
 values, all equal ([Validation](validation.md)). Its hypersphere sheets show Steps 1–5 as spheres;
 the package draws them in its own style ([Visualizations](visualizations.md)).
