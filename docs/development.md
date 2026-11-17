@@ -51,8 +51,8 @@ The virtual environment stores absolute paths; if the project folder moves, crea
 - **Decisions:** every decision goes into [DECISIONS.md](DECISIONS.md). Anything that changes
   numerical results is agreed with the author first.
 - **Protected material:** `resources/` is never modified; the linters and hooks exclude it and
-  `datasets/`, and Git stores them byte for byte. `resources/Article/` (the unpublished article)
-  is not committed (ADR-014).
+  `datasets/`, and Git stores them byte for byte. `resources/Articles/` (the unpublished
+  article) is not committed (ADR-014).
 - **Docstrings:** Google style; every public function names the article step it implements and
   uses the article's notation (ρ, ε, ∅, Sᵢ).
 - **Layers:** the core performs no I/O; the GUI computes nothing; CLI and GUI call the same

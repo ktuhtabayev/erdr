@@ -1,4 +1,4 @@
-"""Acceptance tests: the ERDR workbook ``ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx``.
+"""Acceptance tests: the workbook ``ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx``.
 
 The validator compares every computed sheet with the workbook's cached cells; the explicit values
 below are the workbook's *Validation* sheet, so a change shows up even without the workbook.

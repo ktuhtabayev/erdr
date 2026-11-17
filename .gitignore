@@ -2,7 +2,7 @@
 # Held back until the article is published (ADR-014)
 # The files stay on disk unchanged; they are only kept out of the public repository.
 # =========================
-resources/Article/
+resources/Articles/
 
 # =========================
 # Datasets kept on this computer only (ADR-021)

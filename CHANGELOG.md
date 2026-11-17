@@ -5,6 +5,13 @@ and [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The specification workbook and the article folder were renamed in `resources/` (ADR-024):
+  `erdr validate` and the tests find `ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx`
+  again, and `.gitignore` keeps `resources/Articles/` (the unpublished article) out of the
+  repository.
+
 ## [0.5.0] — 2026-10-17 — datasets by type
 
 ### Added

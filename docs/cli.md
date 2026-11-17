@@ -101,7 +101,7 @@ skipped.
 
 ```text
 $ erdr validate
-ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx  ·  tolerance 1e-09
+ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx  ·  tolerance 1e-09
   Parameters                     5 checks  ✓
   …
   Hyperspheres (Step 1)        235 checks  ✓

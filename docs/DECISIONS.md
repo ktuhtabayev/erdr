@@ -17,7 +17,7 @@ Status values: *accepted*, *superseded by ADR-n*.
 
 *Accepted, 2026-10-11.*
 
-- `resources/Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` specifies every
+- `resources/Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx` specifies every
   computation; its cached cell values are acceptance tests (tolerance 1e-9).
 - `erdr validate` reads the workbook's inputs (Dataset, Parameters) and compares 2,927 values on
   16 sheets, including the workbook's own *Validation* sheet (53 checks), the 270-object
@@ -163,7 +163,7 @@ does not pass. About 150 MB unpacked, 70 MB packed. Built in CI and attached to 
 
 *Accepted, 2026-10-11.*
 
-The workbook, the guide and the datasets are committed; `resources/Article/` (the unpublished
+The workbook, the guide and the datasets are committed; `resources/Articles/` (the unpublished
 article by N. A. Ignatev) is listed in `.gitignore` and stays on disk unchanged. Protected folders
 are stored byte for byte (`-text`); other text files use LF.
 
@@ -467,3 +467,20 @@ their format and styles into our default's … make sure their classes count onl
   to the outcome; WDBC's values have four significant digits.
 
 No numerical result of an existing dataset changes.
+
+## ADR-024 — The workbook and the article folder renamed in resources/ (author)
+
+*Accepted, 2026-11-17.*
+
+The author renamed three items of `resources/`; their contents are unchanged, byte for byte.
+
+- **The workbook.** `Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` became
+  `Experiments/ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx`, like the guide in
+  `Interpretation/`. `WORKBOOK_NAME` — the name `erdr validate` looks for — takes the new name,
+  and the tests read it from `WORKBOOK_NAME`, so the name is written in one place.
+- **The article.** `Article/` became `Articles/`; `.gitignore` lists the new folder, so the
+  unpublished article stays out of the public repository (ADR-014).
+- **The title note.** `Enemy-Radius Density Reduction (ERD.txt` became
+  `Enemy-Radius Density Reduction (ERD).txt` (the missing parenthesis); nothing refers to it.
+
+No numerical result changes.

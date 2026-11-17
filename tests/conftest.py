@@ -8,6 +8,7 @@ import pytest
 from erdr.data import Dataset, load_builtin
 from erdr.data.catalog import resolve_dataset
 from erdr.services.experiment import ExperimentResult, run_experiment
+from erdr.services.validation import WORKBOOK_NAME
 
 # GUI tests draw into memory: no window appears and no display is needed (set before Qt loads)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -15,7 +16,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 DATASETS = ROOT / "datasets"
 CONFIGS = ROOT / "configs"
-WORKBOOK = ROOT / "resources" / "Experiments" / "ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx"
+WORKBOOK = ROOT / "resources" / "Experiments" / WORKBOOK_NAME
 """The ERDR workbook: the specification and its golden values."""
 HEART_270 = DATASETS / "Heterogeneous" / "Heart-Disease" / "Heart-Disease (270, 13, 2)"
 """Stem of the full Heart-Disease files (.csv and .dat)."""

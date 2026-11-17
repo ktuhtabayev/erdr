@@ -4,10 +4,10 @@ Python implementation of the **Enemy-Radius Density Reduction (ERDR)** algorithm
 N. A. Ignatev's article *«Ансамбли алгоритмов распознавания на основе синтетических признаков и
 контекстов k ближайших соседей»* — library, `erdr` command line and desktop GUI. ERDR divides a
 labelled sample E₀ into a **training sample D** and a **validation sample F = E₀ \ D**. The Excel
-workbook `ERDR algorithm [Heart-Disease (7, 13, 2)].xlsx` is the executable specification: the
-package reproduces every one of its computed sheets (2,927 checks), and shows Steps 1–5 as
-hyperspheres — every object's enemy sphere and k-sphere, and in every iteration the spheres that
-contain the selected object and form L.
+workbook `ERDR algorithm [Heart-Disease (7, 13, 2)] - Opus 5.5.xlsx` is the executable
+specification: the package reproduces every one of its computed sheets (2,927 checks), and shows
+Steps 1–5 as hyperspheres — every object's enemy sphere and k-sphere, and in every iteration the
+spheres that contain the selected object and form L.
 
 > **Windows app, no Python needed:** download `erdr-gui-<version>-windows.zip` from the
 > [latest release](https://github.com/ktuhtabayev/erdr/releases/latest), unpack it and start
